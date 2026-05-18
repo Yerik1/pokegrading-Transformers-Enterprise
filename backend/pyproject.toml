@@ -25,6 +25,8 @@ dependencies = [
     "structlog>=24.1,<26.0",
     "python-multipart>=0.0.9,<1.0",
     "psycopg2-binary",
+    "azure-storage-blob[aio]>=12.20,<13.0",
+    "Pillow>=10.4,<12.0",
 ]
 
 [project.optional-dependencies]

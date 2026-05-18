@@ -98,3 +98,7 @@ def requerir_rol(*roles: Rol):
         return usuario
 
     return _verificador
+
+# Alias conveniente: la mayoría de endpoints "admin-only" aceptan ambos roles.
+# Uso: `Depends(requerir_admin_o_superadmin)`
+requerir_admin_o_superadmin = requerir_rol(Rol.ADMIN, Rol.SUPERADMIN)

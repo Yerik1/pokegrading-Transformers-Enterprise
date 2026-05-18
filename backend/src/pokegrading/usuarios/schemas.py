@@ -76,3 +76,32 @@ class RegistroResponse(BaseModel):
 
     usuario: UsuarioResponse
     tokens: TokensResponse
+
+class LoginRequest(BaseModel):
+    """Payload de `POST /api/v1/auth/login`."""
+
+    correo: EmailStr = Field(description="Correo registrado.")
+    contrasena: str = Field(
+        min_length=1,
+        max_length=128,
+        description="Contraseña en texto plano (se compara contra el hash).",
+    )
+
+
+class LoginResponse(BaseModel):
+    """Respuesta de un login exitoso."""
+
+    usuario: UsuarioResponse
+    tokens: TokensResponse
+
+
+class RefreshRequest(BaseModel):
+    """Payload de `POST /api/v1/auth/refresh`."""
+
+    refresh_token: str = Field(min_length=10)
+
+
+class RefreshResponse(BaseModel):
+    """Respuesta de un refresh exitoso: nuevo par de tokens."""
+
+    tokens: TokensResponse

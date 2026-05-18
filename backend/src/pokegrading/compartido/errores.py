@@ -61,7 +61,7 @@ class ErrorDominio(Exception):
 class ErrorValidacion(ErrorDominio):
     """Input inválido en alguna regla de dominio."""
 
-    http_status = status.HTTP_422_UNPROCESSABLE_ENTITY
+    http_status = status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class ErrorConflicto(ErrorDominio):
@@ -129,7 +129,7 @@ def registrar_handlers(app: FastAPI) -> None:
         loc = primer_error.get("loc", [])
         campo = str(loc[-1]) if loc else None
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={
                 "error": "validacion_invalida",
                 "mensaje": primer_error.get("msg", "Datos de entrada inválidos."),

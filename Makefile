@@ -199,6 +199,19 @@ frontend-build:  ## Compila el frontend para produccion
 .PHONY: frontend-type-check
 frontend-type-check:  ## Verifica tipos sin compilar
 	cd $(FRONTEND_DIR) && $(NPM) run type-check
+
+# ============================================================================
+# CLI ADMINISTRATIVO
+# ============================================================================
+
+.PHONY: crear-admin
+crear-admin:  ## Crea un usuario admin/superadmin. Uso: make crear-admin
+	cd $(BACKEND_DIR) && $(PYTHON) -m scripts.crear_admin $(ARGS)
+
+.PHONY: azure-check
+azure-check:  ## Verifica que la conexion a Azure Blob Storage funciona
+	cd $(BACKEND_DIR) && $(PYTHON) -m scripts.verificar_azure
+
 # ============================================================================
 # LIMPIEZA
 # ============================================================================
