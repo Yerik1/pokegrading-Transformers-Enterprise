@@ -1,57 +1,84 @@
 # PokéGrading
 
-PokéGrading es una plataforma de pre-grading asistido para cartas Pokémon. El sistema permite estimar el grado probable de una carta, gestionar un catálogo de referencia, mantener trazabilidad de evaluaciones y preparar la integración futura con servicios externos como PokéMarket.
+Plataforma de pre-grading de cartas Pokémon para LATAM. Segunda iniciativa de PokeVault.
 
-## Estado del proyecto
+> **Estado:** Sprint 1 — scaffold + US "Registrar cuenta" (Submitter).
 
-Sprint 1 — Configuración inicial, arquitectura base y primeras funcionalidades.
+## Stack
 
-Funcionalidades objetivo del Sprint 1:
+- **Backend:** Python 3.12 · FastAPI 0.111 · SQLAlchemy 2 (async) · Pydantic v2 · PostgreSQL 16 · Alembic
+- **Frontend:** _Pendiente — se inicia en la siguiente iteración_
+- **Infra local:** Docker Compose (Postgres)
+- **Arquitectura:** Monolito modular con procesamiento async en background (ver `ADR-001` en el wiki)
 
-- Registrar cuenta.
-- Agregar carta al catálogo.
+## Estructura del repo
 
-## Stack definido
+```text
+pokegrading/
+├── backend/
+│   ├── src/pokegrading/
+│   │   ├── compartido/        Cross-cutting: config, db, logging, errores, seguridad
+│   │   ├── usuarios/          Módulo: cuentas y autenticación
+│   │   ├── catalogo/          Módulo: catálogo de cartas (próximas US)
+│   │   ├── grading/           Módulo: motor de scoring (futuro)
+│   │   └── identificacion/    Módulo: identificación de cartas (futuro)
+│   ├── alembic/               Migraciones de BD
+│   ├── tests/
+│   ├── pyproject.toml
+│   └── Dockerfile
+├── frontend/                  Pendiente
+├── docker-compose.yml
+└── .env.example
+```
 
-- Frontend: React.
-- Backend: FastAPI.
-- Base de datos: PostgreSQL / Azure Database for PostgreSQL.
-- Almacenamiento de imágenes: Azure Blob Storage.
-- Control de versiones: GitHub.
-- Gestión del backlog y wiki: Azure DevOps.
+## Cómo correr el proyecto en local
 
-## Estrategia de ramas
+Requisitos: **Docker** y **Python 3.12+**.
 
-El proyecto usa un flujo basado en `main` y `develop`.
+```bash
+# 1. Copia el archivo de entorno y editalo si quieres
+cp .env.example .env
 
-- `main`: rama estable para releases.
-- `develop`: rama de integración del sprint.
-- `feature/*`: nuevas funcionalidades.
-- `fix/*`: correcciones.
-- `docs/*`: documentación.
-- `chore/*`: configuración y mantenimiento.
-- `hotfix/*`: correcciones urgentes desde `main`.
+# 2. Levanta PostgreSQL local
+docker compose up -d db
 
-Todo cambio debe entrar mediante Pull Request.
+# 3. Instala el backend en modo editable
+cd backend
+python -m venv .venv
+source .venv/bin/activate   # o .venv\Scripts\activate en Windows
+pip install -e ".[dev]"
 
-## Sprint 1
+# 4. Aplica las migraciones
+alembic upgrade head
 
-Las ramas principales esperadas para el Sprint 1 son:
+# 5. Levanta la API
+uvicorn pokegrading.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-- `chore/configuracion-inicial-proyecto`
-- `feature/US-01-registrar-cuenta`
-- `feature/US-02-agregar-carta-catalogo`
-- `docs/evidencia-sprint1`
+API disponible en `http://localhost:8000`. Docs OpenAPI en `http://localhost:8000/docs`.
 
-## Reglas generales
+## Endpoints implementados en Sprint 1
 
-- No se permite hacer push directo a `main` ni `develop`.
-- Todo Pull Request requiere al menos una aprobación.
-- Los cambios deben estar vinculados al backlog de Azure DevOps.
-- No se deben subir secretos, archivos `.env`, tokens ni credenciales.
-- El merge se realiza mediante Squash and Merge.
-- Los commits deben seguir Conventional Commits.
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/v1/usuarios/registro` | Registrar cuenta de Submitter |
+| `GET`  | `/health` | Health check |
 
-## Documentación
+## Convenciones
 
-La documentación oficial del proyecto se mantiene en Azure DevOps Wiki. Este repositorio conserva documentación técnica de apoyo, estrategia de control de código, prompts de IA, diagramas exportados y archivos base del proyecto.
+Siguen lo definido en **V6: Proceso de Construcción** del wiki:
+
+- Archivos/módulos en `snake_case`, clases en `PascalCase`, rutas API en `kebab-case`
+- Formateo: `black` (line-length 88). Linter: `ruff`
+- Type hints obligatorios en funciones públicas. Docstrings estilo Google
+- Todo endpoint FastAPI es `async def`
+- Commits: Conventional Commits (`feat:`, `fix:`, `refactor:`, etc.)
+- Branches: `feature/US-XX-descripcion-corta` desde `develop`
+
+## Errores frecuentes de setup (S1)
+
+1. **`role "postgres" does not exist`** — corre `docker compose down -v` y vuelve a levantar.
+2. **`could not translate host name "db"`** — estás corriendo el backend fuera de Docker; tu `DATABASE_URL` debe apuntar a `localhost`, no a `db`.
+3. **`alembic: command not found`** — activa el venv (`source backend/.venv/bin/activate`).
+4. **`No module named pokegrading`** — corre `pip install -e ".[dev]"` desde `backend/`.
+5. **`asyncpg.exceptions.InvalidCatalogNameError`** — la BD `pokegrading_dev` aún no existe; espera 2-3s a que Postgres termine de arrancar.

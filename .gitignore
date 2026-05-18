@@ -1,57 +1,35 @@
-# Environment files
-.env
-.env.*
-!.env.example
-
-# Secrets and keys
-*.pem
-*.key
-*.pfx
-*.crt
-*.cer
-*.p12
-
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.pytest_cache/
-.coverage
-htmlcov/
+*$py.class
+*.so
+.Python
 .venv/
 venv/
 env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Node / React
-node_modules/
+# Entorno local
+.env
+.env.local
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Build
 dist/
 build/
-.npm/
-.vite/
 
 # Logs
 *.log
-logs/
 
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDEs
-.vscode/
-.idea/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Local database/storage
-*.sqlite
-*.db
-
-# Large local assets
-datasets/
-uploads/
-local-storage/
+# Docker
+.docker/
