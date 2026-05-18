@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-cream text-ink font-sans;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  /* Tipografía display con optical sizing aprovechando Fraunces variable */
+  .font-display {
+    font-optical-sizing: auto;
+  }
+
+  /* Focus visible accesible — anillo holo en lugar del default azul navegador */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-holo ring-offset-2 ring-offset-cream;
+  }
+}
+
+@layer utilities {
+  /* Sutil textura de papel para el fondo — opcional, da calidez al cream */
+  .bg-paper {
+    background-color: #FAF8F3;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(13, 17, 23, 0.04) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+}
