@@ -28,8 +28,8 @@ else
 endif
 
 # Binarios del venv como rutas absolutas (sobreviven cambios de cwd)
-PYTHON  := $(abspath $(VENV_BIN)/python$(EXE))
-PIP     := $(abspath $(VENV_BIN)/pip$(EXE))
+PYTHON  := "$(abspath $(VENV_BIN)/python$(EXE))"
+PIP     := "$(abspath $(VENV_BIN)/pip$(EXE))"
 ALEMBIC := $(PYTHON) -m alembic
 UVICORN := $(PYTHON) -m uvicorn
 PYTEST  := $(PYTHON) -m pytest
@@ -38,7 +38,12 @@ RUFF    := $(PYTHON) -m ruff
 
 DOCKER_COMPOSE := docker compose
 BACKEND_DIR    := backend
-
+# npm en Windows es un shim .cmd; bash no lo encuentra sin la extension explicita
+ifeq ($(OS),Windows_NT)
+    NPM := npm.cmd
+else
+    NPM := npm
+endif
 .DEFAULT_GOAL := help
 
 # Para targets que hacen operaciones de filesystem, usamos Python en vez de
@@ -174,12 +179,11 @@ logs:  ## Tail de logs del API en Docker
 # ============================================================================
 
 FRONTEND_DIR := frontend
-NPM          := npm
+
 
 .PHONY: frontend-install
 frontend-install:  ## Instala dependencias del frontend (npm install)
 	cd $(FRONTEND_DIR) && $(NPM) install
-
 .PHONY: frontend-env
 frontend-env:  ## Crea frontend/.env desde .env.example si no existe
 	@$(PYTHON_BOOTSTRAP) -c "import shutil, pathlib; p = pathlib.Path('$(FRONTEND_DIR)/.env'); shutil.copy('$(FRONTEND_DIR)/.env.example', p) if not p.exists() else None; print('frontend/.env listo')"
@@ -189,13 +193,12 @@ frontend-dev:  ## Levanta el frontend en modo dev (Vite, puerto 5173)
 	cd $(FRONTEND_DIR) && $(NPM) run dev
 
 .PHONY: frontend-build
-frontend-build:  ## Compila el frontend para producción
+frontend-build:  ## Compila el frontend para produccion
 	cd $(FRONTEND_DIR) && $(NPM) run build
 
 .PHONY: frontend-type-check
 frontend-type-check:  ## Verifica tipos sin compilar
 	cd $(FRONTEND_DIR) && $(NPM) run type-check
-
 # ============================================================================
 # LIMPIEZA
 # ============================================================================
