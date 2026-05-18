@@ -6,7 +6,7 @@ para resolver casos de uso. No conoce ni FastAPI ni HTTP.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,7 +79,7 @@ class RegistroService:
 
         # 3) Construir el agregado con todos los defaults requeridos
         settings = obtener_settings()
-        ahora = datetime.now(timezone.utc)
+        ahora = datetime.now(UTC)
 
         nuevo = Usuario(
             correo=correo_normalizado,

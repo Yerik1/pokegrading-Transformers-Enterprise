@@ -9,7 +9,6 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-
 REGISTRO_VALIDO = {
     "correo": "ana@ejemplo.com",
     "alias": "ana_collector",

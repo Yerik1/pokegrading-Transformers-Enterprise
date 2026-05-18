@@ -104,7 +104,9 @@ def registrar_handlers(app: FastAPI) -> None:
     """Registra los exception handlers globales en la app FastAPI."""
 
     @app.exception_handler(ErrorDominio)
-    async def _manejar_error_dominio(request: Request, exc: ErrorDominio) -> JSONResponse:
+    async def _manejar_error_dominio(
+        request: Request, exc: ErrorDominio
+    ) -> JSONResponse:
         correlation_id = getattr(request.state, "correlation_id", None)
         logger.info(
             "error_dominio",

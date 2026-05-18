@@ -19,6 +19,7 @@ export interface ErrorDominioPayload {
 
 export class ErrorDominio extends Error {
   readonly codigo: string;
+  readonly mensaje: string;
   readonly campo: string | undefined;
   readonly correlationId: string | undefined;
   readonly statusHttp: number;
@@ -27,6 +28,7 @@ export class ErrorDominio extends Error {
     super(payload.mensaje);
     this.name = "ErrorDominio";
     this.codigo = payload.error;
+    this.mensaje = payload.mensaje;
     this.campo = payload.campo;
     this.correlationId = payload.correlation_id;
     this.statusHttp = statusHttp;

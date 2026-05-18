@@ -12,7 +12,7 @@ Las contraseñas en claro NUNCA se loguean ni se devuelven al cliente.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 import bcrypt
@@ -85,7 +85,7 @@ def crear_token(
         JWT serializado.
     """
     settings = obtener_settings()
-    ahora = datetime.now(timezone.utc)
+    ahora = datetime.now(UTC)
 
     expira_en = (
         timedelta(minutes=settings.jwt_access_minutes)

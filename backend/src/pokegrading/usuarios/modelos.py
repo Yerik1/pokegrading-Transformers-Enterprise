@@ -50,7 +50,9 @@ class Usuario(Base):
         nullable=False,
     )
     idioma_preferido: Mapped[Idioma] = mapped_column(
-        Enum(Idioma, name="idioma_enum", values_callable=lambda e: [v.value for v in e]),
+        Enum(
+            Idioma, name="idioma_enum", values_callable=lambda e: [v.value for v in e]
+        ),
         nullable=False,
         default=Idioma.ES,
     )
