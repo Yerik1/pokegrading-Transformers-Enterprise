@@ -2,7 +2,7 @@
 # PokéGrading — Makefile
 #
 # Comandos estandarizados para setup, desarrollo y operación del proyecto.
-# Funciona en Windows (con make instalado), macOS y Linux.
+# Funciona en Windows (cmd, PowerShell, Git Bash, MSYS2), macOS y Linux.
 #
 # Uso:
 #   make            -> muestra la lista de targets
@@ -21,17 +21,13 @@ ifeq ($(OS),Windows_NT)
     VENV_BIN          := .venv/Scripts
     EXE               := .exe
     PYTHON_BOOTSTRAP  := py -3.12
-    RM_RF             := rd /s /q
-    NULL              := nul
 else
     VENV_BIN          := .venv/bin
     EXE               :=
     PYTHON_BOOTSTRAP  := python3.12
-    RM_RF             := rm -rf
-    NULL              := /dev/null
 endif
 
-# Binarios del venv como rutas absolutas para sobrevivir cambios de cwd
+# Binarios del venv como rutas absolutas (sobreviven cambios de cwd)
 PYTHON  := $(abspath $(VENV_BIN)/python$(EXE))
 PIP     := $(abspath $(VENV_BIN)/pip$(EXE))
 ALEMBIC := $(PYTHON) -m alembic
@@ -45,17 +41,19 @@ BACKEND_DIR    := backend
 
 .DEFAULT_GOAL := help
 
-# ----------------------------------------------------------------------------
+# Para targets que hacen operaciones de filesystem, usamos Python en vez de
+# `cmd` o `sh` para que sea agnóstico al shell que use make (algunos entornos
+# Windows como Git Bash/MSYS2 usan sh aunque $(OS)=Windows_NT).
+#
+# Para evitar problemas con saltos de línea entre cmd y sh, los scripts de
+# Python se mantienen en UNA SOLA LÍNEA. Verboso pero portable.
+
+# ============================================================================
 # Help (auto-generado desde los comentarios `##`)
-# ----------------------------------------------------------------------------
+# ============================================================================
 .PHONY: help
 help:  ## Muestra esta ayuda
-	@echo PokeGrading - Targets disponibles:
-	@echo.
-	@$(PYTHON_BOOTSTRAP) -c "import re,sys; \
-	lines=open('Makefile',encoding='utf-8').read().splitlines(); \
-	[print(f'  {m.group(1):<18} {m.group(2)}') for l in lines \
-	 for m in [re.match(r'^([a-zA-Z][a-zA-Z0-9_-]+):.*?##\s*(.*)$$', l)] if m]"
+	@$(PYTHON_BOOTSTRAP) -c "import re; lines = open('Makefile', encoding='utf-8').read().splitlines(); print('PokeGrading - Targets disponibles:'); print(''); [print(f'  {m.group(1):<18} {m.group(2)}') for l in lines for m in [re.match(r'^([a-zA-Z][a-zA-Z0-9_-]+):.*?##\s*(.*)$$', l)] if m]"
 
 # ============================================================================
 # SETUP
@@ -74,20 +72,11 @@ install: .venv  ## Instala el backend en modo editable + deps de desarrollo
 
 .PHONY: env
 env:  ## Crea .env desde .env.example si todavia no existe
-ifeq ($(OS),Windows_NT)
-	@if not exist .env (copy .env.example .env > $(NULL))
-	@if not exist .env (echo No se pudo crear .env. & exit 1)
-	@echo .env listo.
-else
-	@test -f .env || cp .env.example .env
-	@echo ".env listo."
-endif
+	@$(PYTHON_BOOTSTRAP) -c "import shutil, pathlib; p = pathlib.Path('.env'); shutil.copy('.env.example', p) if not p.exists() else None; print('.env listo')"
 
 .PHONY: setup
-setup: venv install env db-up wait-db migrate  ## Setup completo desde cero
-	@echo.
-	@echo Setup listo. Para arrancar la API:
-	@echo   make dev
+setup: venv install env db-up wait-db migrate frontend-install frontend-env  ## Setup completo desde cero (backend + frontend)
+	@$(PYTHON_BOOTSTRAP) -c "print(''); print('Setup listo. Levantar:'); print('  Backend:  make dev'); print('  Frontend: make frontend-dev')"
 
 # ============================================================================
 # BASE DE DATOS
@@ -113,13 +102,8 @@ db-shell:  ## Abre psql contra la BD local
 	docker exec -it pokegrading-db psql -U pokegrading -d pokegrading_dev
 
 .PHONY: wait-db
-wait-db:  ## Espera a que Postgres este healthy
-	@$(PYTHON_BOOTSTRAP) -c "import time, subprocess; \
-	[time.sleep(1) or (print('Esperando Postgres...') if i%3==0 else None) \
-	 for i in range(30) \
-	 if subprocess.run(['docker','exec','pokegrading-db','pg_isready','-U','pokegrading'], \
-	   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0] \
-	and print('Postgres listo.') or print('Postgres listo.')"
+wait-db:  ## Espera a que Postgres este healthy (max 30s)
+	@$(PYTHON_BOOTSTRAP) -c "import subprocess,time,sys; r=subprocess.run; [sys.exit(0) if r(['docker','exec','pokegrading-db','pg_isready','-U','pokegrading'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0 and not print('Postgres listo.') else (print('Esperando Postgres... ({}/30)'.format(i+1)), time.sleep(1)) for i in range(30)]; print('Postgres no respondio en 30s'); sys.exit(1)"
 
 .PHONY: migrate
 migrate:  ## Aplica todas las migraciones pendientes
@@ -132,9 +116,7 @@ downgrade:  ## Revierte la ultima migracion
 .PHONY: migration
 migration:  ## Crea una migracion nueva. Uso: make migration MSG="descripcion"
 ifndef MSG
-	@echo Error: MSG es requerido.
-	@echo Uso: make migration MSG="agregar tabla cartas"
-	@exit 1
+	@$(PYTHON_BOOTSTRAP) -c "import sys; print('Error: MSG es requerido. Uso: make migration MSG=\"agregar tabla cartas\"'); sys.exit(1)"
 endif
 	cd $(BACKEND_DIR) && $(ALEMBIC) revision --autogenerate -m "$(MSG)"
 
@@ -165,7 +147,7 @@ format:  ## Formatea con black y arregla imports con ruff
 
 .PHONY: check
 check: lint test  ## Lo que valida CI: lint + test
-	@echo Check OK.
+	@$(PYTHON_BOOTSTRAP) -c "print('Check OK.')"
 
 # ============================================================================
 # DOCKER (stack completo, opcional)
@@ -188,29 +170,41 @@ logs:  ## Tail de logs del API en Docker
 	$(DOCKER_COMPOSE) logs -f api
 
 # ============================================================================
+# FRONTEND
+# ============================================================================
+
+FRONTEND_DIR := frontend
+NPM          := npm
+
+.PHONY: frontend-install
+frontend-install:  ## Instala dependencias del frontend (npm install)
+	cd $(FRONTEND_DIR) && $(NPM) install
+
+.PHONY: frontend-env
+frontend-env:  ## Crea frontend/.env desde .env.example si no existe
+	@$(PYTHON_BOOTSTRAP) -c "import shutil, pathlib; p = pathlib.Path('$(FRONTEND_DIR)/.env'); shutil.copy('$(FRONTEND_DIR)/.env.example', p) if not p.exists() else None; print('frontend/.env listo')"
+
+.PHONY: frontend-dev
+frontend-dev:  ## Levanta el frontend en modo dev (Vite, puerto 5173)
+	cd $(FRONTEND_DIR) && $(NPM) run dev
+
+.PHONY: frontend-build
+frontend-build:  ## Compila el frontend para producción
+	cd $(FRONTEND_DIR) && $(NPM) run build
+
+.PHONY: frontend-type-check
+frontend-type-check:  ## Verifica tipos sin compilar
+	cd $(FRONTEND_DIR) && $(NPM) run type-check
+
+# ============================================================================
 # LIMPIEZA
 # ============================================================================
 
 .PHONY: clean
 clean:  ## Borra caches de Python y reportes de tests
-ifeq ($(OS),Windows_NT)
-	@for /d /r . %%d in (__pycache__) do @if exist "%%d" $(RM_RF) "%%d" 2> $(NULL)
-	@if exist .pytest_cache $(RM_RF) .pytest_cache
-	@if exist .ruff_cache $(RM_RF) .ruff_cache
-	@if exist htmlcov $(RM_RF) htmlcov
-	@if exist .coverage del .coverage
-else
-	@find . -type d -name __pycache__ -exec $(RM_RF) {} + 2> $(NULL) || true
-	@$(RM_RF) .pytest_cache .ruff_cache htmlcov .coverage
-endif
-	@echo Caches limpiadas.
+	@$(PYTHON_BOOTSTRAP) -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('__pycache__')]; [shutil.rmtree(d, ignore_errors=True) for d in ['.pytest_cache', '.ruff_cache', 'htmlcov', '.mypy_cache']]; pathlib.Path('.coverage').unlink(missing_ok=True); print('Caches limpiadas.')"
 
 .PHONY: nuke
-nuke: clean  ## TODO: borra venv + volumen de docker + caches. Reconstruye con `make setup`.
+nuke: clean  ## TODO: borra venv + volumen docker + caches. Reconstruye con make setup.
 	-$(DOCKER_COMPOSE) down -v
-ifeq ($(OS),Windows_NT)
-	@if exist .venv $(RM_RF) .venv
-else
-	@$(RM_RF) .venv
-endif
-	@echo Todo destruido. Reconstruye con: make setup
+	@$(PYTHON_BOOTSTRAP) -c "import shutil; shutil.rmtree('.venv', ignore_errors=True); print('venv y volumen destruidos. Reconstruye con: make setup')"
