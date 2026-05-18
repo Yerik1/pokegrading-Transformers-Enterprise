@@ -48,9 +48,7 @@ async def agregar_carta_al_catalogo(
     ],
     imagen_frente: Annotated[UploadFile, File(description="Imagen frontal requerida.")],
     sesion: Annotated[AsyncSession, Depends(obtener_sesion)],
-    almacenamiento: Annotated[
-        IAlmacenamientoImagenes, Depends(obtener_almacenamiento)
-    ],
+    almacenamiento: Annotated[IAlmacenamientoImagenes, Depends(obtener_almacenamiento)],
     usuario_actual: Annotated[Usuario, Depends(requerir_admin_o_superadmin)],
     imagen_reverso: Annotated[
         UploadFile | None, File(description="Imagen del reverso (opcional).")

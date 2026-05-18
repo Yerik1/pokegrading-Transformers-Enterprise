@@ -13,6 +13,7 @@ export type Rol =
   | "submitter"
   | "reviewer"
   | "admin"
+  | "superadmin"
   | "b2b_service_account";
 
 /** Listado de países atendidos con su nombre legible para el selector. */

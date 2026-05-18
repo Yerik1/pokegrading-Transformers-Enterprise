@@ -60,7 +60,9 @@ class Carta(Base):
     set_codigo: Mapped[str] = mapped_column(String(50), nullable=False)
     numero: Mapped[str] = mapped_column(String(20), nullable=False)
     edicion: Mapped[Edicion] = mapped_column(
-        Enum(Edicion, name="edicion_enum", values_callable=lambda e: [v.value for v in e]),
+        Enum(
+            Edicion, name="edicion_enum", values_callable=lambda e: [v.value for v in e]
+        ),
         nullable=False,
     )
     idioma: Mapped[IdiomaCarta] = mapped_column(
@@ -72,14 +74,18 @@ class Carta(Base):
         nullable=False,
     )
     acabado: Mapped[Acabado] = mapped_column(
-        Enum(Acabado, name="acabado_enum", values_callable=lambda e: [v.value for v in e]),
+        Enum(
+            Acabado, name="acabado_enum", values_callable=lambda e: [v.value for v in e]
+        ),
         nullable=False,
     )
 
     # === Display (todo opcional, recomendado pero no requerido) ===
     nombre: Mapped[str | None] = mapped_column(String(100), nullable=True)
     rareza: Mapped[Rareza | None] = mapped_column(
-        Enum(Rareza, name="rareza_enum", values_callable=lambda e: [v.value for v in e]),
+        Enum(
+            Rareza, name="rareza_enum", values_callable=lambda e: [v.value for v in e]
+        ),
         nullable=True,
     )
     tipo: Mapped[TipoPokemon | None] = mapped_column(

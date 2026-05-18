@@ -77,6 +77,7 @@ class RegistroResponse(BaseModel):
     usuario: UsuarioResponse
     tokens: TokensResponse
 
+
 class LoginRequest(BaseModel):
     """Payload de `POST /api/v1/auth/login`."""
 

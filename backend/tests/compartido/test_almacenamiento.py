@@ -47,9 +47,7 @@ async def test_guardar_devuelve_url_no_vacia(
 async def test_obtener_url_devuelve_misma_url_que_guardar(
     almacenamiento: IAlmacenamientoImagenes,
 ) -> None:
-    url_guardar = await almacenamiento.guardar(
-        "cartas", "k.jpg", b"v", "image/jpeg"
-    )
+    url_guardar = await almacenamiento.guardar("cartas", "k.jpg", b"v", "image/jpeg")
     url_obtener = await almacenamiento.obtener_url("cartas", "k.jpg")
     assert url_guardar == url_obtener
 

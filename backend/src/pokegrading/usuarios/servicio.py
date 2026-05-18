@@ -13,9 +13,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido.config import obtener_settings
-from pokegrading.compartido.errores import (ErrorConflicto, ErrorAutenticacion)
+from pokegrading.compartido.errores import ErrorAutenticacion, ErrorConflicto
 from pokegrading.compartido.logging import obtener_logger
-from pokegrading.compartido.seguridad import crear_token, hashear_password, decodificar_token, verificar_password
+from pokegrading.compartido.seguridad import (
+    crear_token,
+    decodificar_token,
+    hashear_password,
+    verificar_password,
+)
 from pokegrading.usuarios import reglas
 from pokegrading.usuarios.modelos import Usuario
 from pokegrading.usuarios.repositorio import UsuarioRepositorio
@@ -129,6 +134,7 @@ class RegistroService:
             tokens=TokensResponse(access_token=access, refresh_token=refresh),
         )
 
+
 class LoginService:
     """Caso de uso: autenticar credenciales y emitir un par de tokens."""
 
@@ -157,9 +163,8 @@ class LoginService:
 
         # Verificamos password incluso si no hay usuario para evitar timing
         # attack que delate la existencia del correo.
-        password_valida = (
-            usuario is not None
-            and verificar_password(datos.contrasena, usuario.hash_password)
+        password_valida = usuario is not None and verificar_password(
+            datos.contrasena, usuario.hash_password
         )
 
         if usuario is None or not password_valida:
