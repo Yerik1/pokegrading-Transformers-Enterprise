@@ -65,6 +65,7 @@ jobs:
       JWT_REFRESH_DAYS: "7"
       LOG_LEVEL: WARNING
       DISCLOSURE_VERSION: v1.0
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=https;AccountName=fake;AccountKey=ZmFrZQ==;EndpointSuffix=core.windows.net"
 
     steps:
       - name: Checkout

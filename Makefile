@@ -1,213 +1,211 @@
 # =============================================================================
-# PokéGrading — Makefile
+# PokéGrading — Makefile del proyecto
 #
-# Comandos estandarizados para setup, desarrollo y operación del proyecto.
-# Funciona en Windows (cmd, PowerShell, Git Bash, MSYS2), macOS y Linux.
+# Cubre los workflows de Sprint 1: backend (FastAPI + Postgres + Azure Blob)
+# y frontend (Vite + React + Tailwind).
 #
-# Uso:
-#   make            -> muestra la lista de targets
-#   make setup      -> setup completo desde cero (venv + deps + db + migrate)
-#   make dev        -> levanta la API con hot reload
-#   make test       -> corre la suite de tests
-#   make check      -> lint + test (lo que valida CI antes de merge)
-#
-# Convención: targets con `##` aparecen en `make help`.
+# Cross-platform: detecta Windows vs Unix y elige binarios apropiados.
+# Las rutas se quotean para soportar espacios y tildes en directorios.
 # =============================================================================
 
-# ----------------------------------------------------------------------------
-# Detección de OS y rutas portables
-# ----------------------------------------------------------------------------
-ifeq ($(OS),Windows_NT)
-    VENV_BIN          := .venv/Scripts
-    EXE               := .exe
-    PYTHON_BOOTSTRAP  := py -3.12
-else
-    VENV_BIN          := .venv/bin
-    EXE               :=
-    PYTHON_BOOTSTRAP  := python3.12
-endif
+SHELL := /bin/bash
+.SHELLFLAGS := -eu -o pipefail -c
 
-# Binarios del venv como rutas absolutas (sobreviven cambios de cwd)
-PYTHON  := "$(abspath $(VENV_BIN)/python$(EXE))"
-PIP     := "$(abspath $(VENV_BIN)/pip$(EXE))"
-ALEMBIC := $(PYTHON) -m alembic
-UVICORN := $(PYTHON) -m uvicorn
-PYTEST  := $(PYTHON) -m pytest
-BLACK   := $(PYTHON) -m black
-RUFF    := $(PYTHON) -m ruff
+BACKEND_DIR := backend
+FRONTEND_DIR := frontend
+VENV_DIR := .venv
 
-DOCKER_COMPOSE := docker compose
-BACKEND_DIR    := backend
-# npm en Windows es un shim .cmd; bash no lo encuentra sin la extension explicita
+# Detectar OS para usar el Python correcto (.exe en Windows)
 ifeq ($(OS),Windows_NT)
+    PYTHON := $(abspath $(VENV_DIR)/Scripts/python.exe)
     NPM := npm.cmd
 else
+    PYTHON := $(abspath $(VENV_DIR)/bin/python)
     NPM := npm
 endif
+
 .DEFAULT_GOAL := help
 
-# Para targets que hacen operaciones de filesystem, usamos Python en vez de
-# `cmd` o `sh` para que sea agnóstico al shell que use make (algunos entornos
-# Windows como Git Bash/MSYS2 usan sh aunque $(OS)=Windows_NT).
-#
-# Para evitar problemas con saltos de línea entre cmd y sh, los scripts de
-# Python se mantienen en UNA SOLA LÍNEA. Verboso pero portable.
+# =============================================================================
+# HELP
+# =============================================================================
 
-# ============================================================================
-# Help (auto-generado desde los comentarios `##`)
-# ============================================================================
 .PHONY: help
-help:  ## Muestra esta ayuda
-	@$(PYTHON_BOOTSTRAP) -c "import re; lines = open('Makefile', encoding='utf-8').read().splitlines(); print('PokeGrading - Targets disponibles:'); print(''); [print(f'  {m.group(1):<18} {m.group(2)}') for l in lines for m in [re.match(r'^([a-zA-Z][a-zA-Z0-9_-]+):.*?##\s*(.*)$$', l)] if m]"
+help:  ## Lista todos los targets disponibles
+	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 
-# ============================================================================
+# =============================================================================
 # SETUP
-# ============================================================================
+# =============================================================================
 
-.venv:
-	$(PYTHON_BOOTSTRAP) -m venv .venv
-	$(PIP) install --upgrade pip
+.PHONY: setup env install frontend-install
 
-.PHONY: venv
-venv: .venv  ## Crea la virtualenv .venv con Python 3.12
+setup: env install frontend-install  ## Setup completo: env + backend deps + frontend deps
 
-.PHONY: install
-install: .venv  ## Instala el backend en modo editable + deps de desarrollo
-	$(PIP) install -e "./$(BACKEND_DIR)[dev]"
+env:  ## Crea .env desde .env.example si no existe
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo ".env creado desde .env.example — editalo con tus valores reales"; \
+	else \
+		echo ".env ya existe"; \
+	fi
 
-.PHONY: env
-env:  ## Crea .env desde .env.example si todavia no existe
-	@$(PYTHON_BOOTSTRAP) -c "import shutil, pathlib; p = pathlib.Path('.env'); shutil.copy('.env.example', p) if not p.exists() else None; print('.env listo')"
+install:  ## Crea venv (si no existe) e instala deps del backend en modo editable
+	@python -m venv $(VENV_DIR) 2>/dev/null || true
+	"$(PYTHON)" -m pip install --upgrade pip
+	"$(PYTHON)" -m pip install -e "./$(BACKEND_DIR)[dev]"
 
-.PHONY: setup
-setup: venv install env db-up wait-db migrate frontend-install frontend-env  ## Setup completo desde cero (backend + frontend)
-	@$(PYTHON_BOOTSTRAP) -c "print(''); print('Setup listo. Levantar:'); print('  Backend:  make dev'); print('  Frontend: make frontend-dev')"
-
-# ============================================================================
-# BASE DE DATOS
-# ============================================================================
-
-.PHONY: db-up
-db-up:  ## Levanta PostgreSQL en Docker (background)
-	$(DOCKER_COMPOSE) up -d db
-
-.PHONY: db-down
-db-down:  ## Detiene PostgreSQL sin borrar datos
-	$(DOCKER_COMPOSE) stop db
-
-.PHONY: db-reset
-db-reset:  ## DESTRUYE el volumen de Postgres y vuelve a migrarlo limpio
-	$(DOCKER_COMPOSE) down -v
-	$(DOCKER_COMPOSE) up -d db
-	@$(MAKE) wait-db
-	@$(MAKE) migrate
-
-.PHONY: db-shell
-db-shell:  ## Abre psql contra la BD local
-	docker exec -it pokegrading-db psql -U pokegrading -d pokegrading_dev
-
-.PHONY: wait-db
-wait-db:  ## Espera a que Postgres este healthy (max 30s)
-	@$(PYTHON_BOOTSTRAP) -c "import subprocess,time,sys; r=subprocess.run; [sys.exit(0) if r(['docker','exec','pokegrading-db','pg_isready','-U','pokegrading'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0 and not print('Postgres listo.') else (print('Esperando Postgres... ({}/30)'.format(i+1)), time.sleep(1)) for i in range(30)]; print('Postgres no respondio en 30s'); sys.exit(1)"
-
-.PHONY: migrate
-migrate:  ## Aplica todas las migraciones pendientes
-	cd $(BACKEND_DIR) && $(ALEMBIC) upgrade head
-
-.PHONY: downgrade
-downgrade:  ## Revierte la ultima migracion
-	cd $(BACKEND_DIR) && $(ALEMBIC) downgrade -1
-
-.PHONY: migration
-migration:  ## Crea una migracion nueva. Uso: make migration MSG="descripcion"
-ifndef MSG
-	@$(PYTHON_BOOTSTRAP) -c "import sys; print('Error: MSG es requerido. Uso: make migration MSG=\"agregar tabla cartas\"'); sys.exit(1)"
-endif
-	cd $(BACKEND_DIR) && $(ALEMBIC) revision --autogenerate -m "$(MSG)"
-
-# ============================================================================
-# DESARROLLO
-# ============================================================================
-
-.PHONY: dev
-dev:  ## Levanta la API con hot reload (uvicorn)
-	cd $(BACKEND_DIR) && $(UVICORN) pokegrading.main:app --reload --host 0.0.0.0 --port 8000
-
-.PHONY: test
-test:  ## Corre la suite de tests
-	cd $(BACKEND_DIR) && $(PYTEST)
-
-.PHONY: test-cov
-test-cov:  ## Corre los tests con reporte de cobertura
-	cd $(BACKEND_DIR) && $(PYTEST) --cov=pokegrading --cov-report=term-missing --cov-report=html
-
-.PHONY: lint
-lint:  ## Detecta problemas con ruff
-	$(RUFF) check $(BACKEND_DIR)/src $(BACKEND_DIR)/tests
-
-.PHONY: format
-format:  ## Formatea con black y arregla imports con ruff
-	$(BLACK) $(BACKEND_DIR)/src $(BACKEND_DIR)/tests
-	$(RUFF) check --fix $(BACKEND_DIR)/src $(BACKEND_DIR)/tests
-
-.PHONY: check
-check: lint test  ## Lo que valida CI: lint + test
-	@$(PYTHON_BOOTSTRAP) -c "print('Check OK.')"
-
-# ============================================================================
-# DOCKER (stack completo, opcional)
-# ============================================================================
-
-.PHONY: docker-build
-docker-build:  ## Build de la imagen del backend
-	$(DOCKER_COMPOSE) --profile full build api
-
-.PHONY: docker-up
-docker-up:  ## Levanta API + DB en Docker (sin hot reload)
-	$(DOCKER_COMPOSE) --profile full up -d
-
-.PHONY: docker-down
-docker-down:  ## Detiene el stack completo (sin borrar datos)
-	$(DOCKER_COMPOSE) --profile full down
-
-.PHONY: logs
-logs:  ## Tail de logs del API en Docker
-	$(DOCKER_COMPOSE) logs -f api
-
-# ============================================================================
-# FRONTEND
-# ============================================================================
-
-FRONTEND_DIR := frontend
-
-
-.PHONY: frontend-install
-frontend-install:  ## Instala dependencias del frontend (npm install)
+frontend-install:  ## Instala dependencias del frontend
 	cd $(FRONTEND_DIR) && $(NPM) install
-.PHONY: frontend-env
-frontend-env:  ## Crea frontend/.env desde .env.example si no existe
-	@$(PYTHON_BOOTSTRAP) -c "import shutil, pathlib; p = pathlib.Path('$(FRONTEND_DIR)/.env'); shutil.copy('$(FRONTEND_DIR)/.env.example', p) if not p.exists() else None; print('frontend/.env listo')"
 
-.PHONY: frontend-dev
-frontend-dev:  ## Levanta el frontend en modo dev (Vite, puerto 5173)
+# =============================================================================
+# BACKEND - BD (Postgres en Docker)
+# =============================================================================
+
+.PHONY: db-up db-down db-reset db-shell wait-db
+
+db-up:  ## Levanta Postgres en Docker
+	docker compose up -d db
+
+db-down:  ## Apaga Postgres
+	docker compose stop db
+
+db-reset:  ## Borra el volumen de Postgres y vuelve a aplicar migraciones (destructivo)
+	docker compose down -v
+	$(MAKE) db-up
+	$(MAKE) wait-db
+	$(MAKE) migrate
+
+db-shell:  ## Abre psql contra la BD de dev
+	docker compose exec db psql -U pokegrading -d pokegrading
+
+wait-db:  ## Espera hasta 10s a que Postgres esté listo
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		docker compose exec -T db pg_isready -U pokegrading >/dev/null 2>&1 && exit 0; \
+		sleep 1; \
+	done; \
+	echo "ERROR: Postgres no respondió en 10s"; exit 1
+
+# =============================================================================
+# BACKEND - MIGRACIONES (Alembic)
+# =============================================================================
+
+.PHONY: migrate downgrade migration
+
+migrate:  ## Aplica todas las migraciones pendientes
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m alembic upgrade head
+
+downgrade:  ## Revierte la última migración
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m alembic downgrade -1
+
+migration:  ## Crea migración nueva. Uso: make migration MSG="descripcion corta"
+	@if [ -z "$(MSG)" ]; then \
+		echo "ERROR: especificar MSG. Uso: make migration MSG='descripcion'"; \
+		exit 1; \
+	fi
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m alembic revision --autogenerate -m "$(MSG)"
+
+# =============================================================================
+# BACKEND - DEV / TEST / LINT
+# =============================================================================
+
+.PHONY: dev test test-cov lint format
+
+dev:  ## Levanta backend FastAPI con auto-reload en localhost:8000
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m uvicorn pokegrading.main:app --reload --port 8000
+
+test:  ## Corre todos los tests del backend
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m pytest
+
+test-cov:  ## Tests con reporte de cobertura (HTML en backend/htmlcov, umbral 75%)
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m pytest \
+		--cov=src/pokegrading \
+		--cov-report=term-missing \
+		--cov-report=html \
+		--cov-report=xml \
+		--cov-fail-under=75
+
+lint:  ## Verifica formato y estilo del backend (sin modificar archivos)
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m ruff check src tests
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m black --check src tests
+
+format:  ## Aplica formato y arregla fixes de lint en el backend
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m ruff check --fix src tests
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m black src tests
+
+# =============================================================================
+# BACKEND - SCRIPTS / CLI
+# =============================================================================
+
+.PHONY: crear-admin azure-check
+
+crear-admin:  ## Crea un usuario admin/superadmin. Uso: make crear-admin ARGS="--correo X --alias Y --rol superadmin"
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m scripts.crear_admin $(ARGS)
+
+azure-check:  ## Verifica que la conexión a Azure Blob Storage funciona
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m scripts.verificar_azure
+
+# =============================================================================
+# FRONTEND
+# =============================================================================
+
+.PHONY: frontend-dev frontend-build frontend-type-check
+
+frontend-dev:  ## Levanta frontend Vite en localhost:5173
 	cd $(FRONTEND_DIR) && $(NPM) run dev
 
-.PHONY: frontend-build
-frontend-build:  ## Compila el frontend para produccion
+frontend-build:  ## Build de producción del frontend
 	cd $(FRONTEND_DIR) && $(NPM) run build
 
-.PHONY: frontend-type-check
-frontend-type-check:  ## Verifica tipos sin compilar
+frontend-type-check:  ## Verifica tipos de TypeScript (strict mode)
 	cd $(FRONTEND_DIR) && $(NPM) run type-check
-# ============================================================================
+
+# =============================================================================
+# QA / CHECK GLOBAL
+# =============================================================================
+
+.PHONY: check check-all
+
+check: lint frontend-type-check  ## Lint backend + type-check frontend (rápido, sin tests)
+
+check-all: lint test frontend-type-check frontend-build  ## Suite completa: lint + tests + frontend build
+
+# =============================================================================
+# DOCKER (full stack opcional)
+# =============================================================================
+
+.PHONY: docker-build docker-up docker-down logs
+
+docker-build:  ## Construye las imágenes Docker del stack completo
+	docker compose build
+
+docker-up:  ## Levanta todos los servicios con Docker
+	docker compose up -d
+
+docker-down:  ## Apaga todos los servicios Docker
+	docker compose down
+
+logs:  ## Tail de los logs de Docker
+	docker compose logs -f
+
+# =============================================================================
 # LIMPIEZA
-# ============================================================================
+# =============================================================================
 
-.PHONY: clean
-clean:  ## Borra caches de Python y reportes de tests
-	@$(PYTHON_BOOTSTRAP) -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('__pycache__')]; [shutil.rmtree(d, ignore_errors=True) for d in ['.pytest_cache', '.ruff_cache', 'htmlcov', '.mypy_cache']]; pathlib.Path('.coverage').unlink(missing_ok=True); print('Caches limpiadas.')"
+.PHONY: clean nuke
 
-.PHONY: nuke
-nuke: clean  ## TODO: borra venv + volumen docker + caches. Reconstruye con make setup.
-	-$(DOCKER_COMPOSE) down -v
-	@$(PYTHON_BOOTSTRAP) -c "import shutil; shutil.rmtree('.venv', ignore_errors=True); print('venv y volumen destruidos. Reconstruye con: make setup')"
+clean:  ## Limpia caches de Python, pytest, ruff y dist del frontend
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name .ruff_cache -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name .mypy_cache -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf $(BACKEND_DIR)/htmlcov $(BACKEND_DIR)/.coverage $(BACKEND_DIR)/coverage.xml
+	@rm -rf $(FRONTEND_DIR)/dist $(FRONTEND_DIR)/node_modules/.cache
+	@echo "Limpieza completa."
+
+nuke: clean  ## clean + borra venv + node_modules + volumen Docker (todo destructivo)
+	docker compose down -v 2>/dev/null || true
+	rm -rf $(VENV_DIR)
+	rm -rf $(FRONTEND_DIR)/node_modules
+	@echo "Repo limpio. Corré 'make setup' para volver a empezar."

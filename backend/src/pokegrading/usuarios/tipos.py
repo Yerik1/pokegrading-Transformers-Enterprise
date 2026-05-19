@@ -6,11 +6,20 @@ from enum import StrEnum
 
 
 class Rol(StrEnum):
-    """Roles del sistema (SP1). El MVP solo permite registrar `SUBMITTER`."""
+    """Roles del sistema (SP1).
+
+    Jerarquía administrativa:
+    - ADMIN: gestiona catálogo y usuarios.
+    - SUPERADMIN: todo lo de ADMIN + gestión de admins y configuración del sistema.
+
+    El registro público (`POST /api/v1/usuarios/registro`) solo crea SUBMITTER.
+    Los roles administrativos se crean por CLI (`scripts/crear_admin.py`).
+    """
 
     SUBMITTER = "submitter"
     REVIEWER = "reviewer"
     ADMIN = "admin"
+    SUPERADMIN = "superadmin"
     B2B_SERVICE_ACCOUNT = "b2b_service_account"
 
 

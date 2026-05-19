@@ -1,6 +1,10 @@
-"""Router HTTP del módulo `usuarios`.
+"""Routers HTTP del módulo `usuarios`.
 
-Rutas en `kebab-case`, prefijo versionado `/api/v1/usuarios` (V6 §3.1).
+Expone dos routers:
+- `router` (prefix `/api/v1/usuarios`): gestión de cuentas (registro).
+- `auth_router` (prefix `/api/v1/auth`): operaciones de autenticación (login, refresh).
+
+Rutas en `kebab-case`, prefijo versionado (V6 §3.1).
 """
 
 from __future__ import annotations
@@ -11,10 +15,22 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido.db import obtener_sesion
-from pokegrading.usuarios.schemas import RegistroRequest, RegistroResponse
-from pokegrading.usuarios.servicio import RegistroService
+from pokegrading.usuarios.schemas import (
+    LoginRequest,
+    LoginResponse,
+    RefreshRequest,
+    RefreshResponse,
+    RegistroRequest,
+    RegistroResponse,
+)
+from pokegrading.usuarios.servicio import (
+    LoginService,
+    RefreshService,
+    RegistroService,
+)
 
 router = APIRouter(prefix="/api/v1/usuarios", tags=["usuarios"])
+auth_router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
 @router.post(
@@ -32,16 +48,40 @@ async def registrar_cuenta(
     datos: RegistroRequest,
     sesion: Annotated[AsyncSession, Depends(obtener_sesion)],
 ) -> RegistroResponse:
-    """Endpoint de registro de cuenta.
-
-    Cubre la US "Registrar cuenta" del Sprint 1.
-
-    Args:
-        datos: payload validado por Pydantic.
-        sesion: sesión de BD inyectada por FastAPI.
-
-    Returns:
-        Usuario público y par de tokens iniciales.
-    """
+    """Endpoint de registro de cuenta — cubre la US Registrar Cuenta."""
     servicio = RegistroService(sesion)
+    return await servicio.ejecutar(datos)
+
+
+@auth_router.post(
+    "/login",
+    response_model=LoginResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Autenticar y obtener tokens",
+)
+async def login(
+    datos: LoginRequest,
+    sesion: Annotated[AsyncSession, Depends(obtener_sesion)],
+) -> LoginResponse:
+    """Verifica credenciales y devuelve un par de tokens."""
+    servicio = LoginService(sesion)
+    return await servicio.ejecutar(datos)
+
+
+@auth_router.post(
+    "/refresh",
+    response_model=RefreshResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Renovar tokens con un refresh token válido",
+    description=(
+        "Implementa rotación: cada refresh devuelve un nuevo refresh token, "
+        "no el mismo. Esto reduce la ventana de exposición si el token se filtra."
+    ),
+)
+async def refresh(
+    datos: RefreshRequest,
+    sesion: Annotated[AsyncSession, Depends(obtener_sesion)],
+) -> RefreshResponse:
+    """Emite un nuevo par de tokens a partir de un refresh token."""
+    servicio = RefreshService(sesion)
     return await servicio.ejecutar(datos)

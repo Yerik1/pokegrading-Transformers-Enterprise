@@ -1,4 +1,5 @@
 import { RegistroForm } from "@/usuarios/componentes/RegistroForm";
+import { Link } from "react-router-dom";
 
 /**
  * Página de registro.
@@ -52,12 +53,9 @@ export function RegistroPagina() {
 
             <p className="mt-8 text-sm text-ink-subtle">
               ¿Ya tienes cuenta?{" "}
-              <a
-                href="#"
-                className="font-medium text-holo underline decoration-holo/30 underline-offset-4 hover:decoration-holo"
-              >
+              <Link to="/login" className="font-medium text-holo underline decoration-holo/30 underline-offset-4 hover:decoration-holo">
                 Inicia sesión
-              </a>
+              </Link>
             </p>
           </div>
         </section>

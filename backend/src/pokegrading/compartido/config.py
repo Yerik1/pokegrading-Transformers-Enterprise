@@ -47,6 +47,19 @@ class Settings(BaseSettings):
     jwt_access_minutes: int = 15
     jwt_refresh_days: int = 7
 
+    # Azure Blob Storage (Fase 1B)
+    # Connection string del Storage Account `stpokegradingdev`.
+    # Obtenerla del Portal: Storage Account → Access keys → key1 → Connection string.
+    # NUNCA commitear este valor — usar Key Vault en prod (SP8).
+    azure_storage_connection_string: str = Field(
+        ...,
+        description="Connection string de Azure Storage para acceso a Blob.",
+    )
+    azure_blob_container_cartas: str = Field(
+        default="cartas-referencia",
+        description="Nombre del contenedor para imágenes de catálogo de cartas.",
+    )
+
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     disclosure_version: str = "v1.0"

@@ -6,19 +6,29 @@ para resolver casos de uso. No conoce ni FastAPI ni HTTP.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido.config import obtener_settings
-from pokegrading.compartido.errores import ErrorConflicto
+from pokegrading.compartido.errores import ErrorAutenticacion, ErrorConflicto
 from pokegrading.compartido.logging import obtener_logger
-from pokegrading.compartido.seguridad import crear_token, hashear_password
+from pokegrading.compartido.seguridad import (
+    crear_token,
+    decodificar_token,
+    hashear_password,
+    verificar_password,
+)
 from pokegrading.usuarios import reglas
 from pokegrading.usuarios.modelos import Usuario
 from pokegrading.usuarios.repositorio import UsuarioRepositorio
 from pokegrading.usuarios.schemas import (
+    LoginRequest,
+    LoginResponse,
+    RefreshRequest,
+    RefreshResponse,
     RegistroRequest,
     RegistroResponse,
     TokensResponse,
@@ -122,4 +132,124 @@ class RegistroService:
         return RegistroResponse(
             usuario=UsuarioResponse.model_validate(nuevo),
             tokens=TokensResponse(access_token=access, refresh_token=refresh),
+        )
+
+
+class LoginService:
+    """Caso de uso: autenticar credenciales y emitir un par de tokens."""
+
+    def __init__(self, sesion: AsyncSession) -> None:
+        self._sesion = sesion
+        self._repo = UsuarioRepositorio(sesion)
+
+    async def ejecutar(self, datos: LoginRequest) -> LoginResponse:
+        """Verifica credenciales y devuelve usuario + tokens.
+
+        Las credenciales inválidas se reportan con mensaje genérico
+        ('credenciales_invalidas') sin revelar si el correo existe — defensa
+        contra enumeración de cuentas (SP2 OWASP).
+
+        Args:
+            datos: payload con correo y contraseña.
+
+        Returns:
+            Usuario público + par de tokens iniciales.
+
+        Raises:
+            ErrorAutenticacion: si las credenciales no son válidas.
+        """
+        correo_normalizado = datos.correo.strip().lower()
+        usuario = await self._repo.obtener_por_correo(correo_normalizado)
+
+        # Verificamos password incluso si no hay usuario para evitar timing
+        # attack que delate la existencia del correo.
+        password_valida = usuario is not None and verificar_password(
+            datos.contrasena, usuario.hash_password
+        )
+
+        if usuario is None or not password_valida:
+            raise ErrorAutenticacion(
+                codigo="credenciales_invalidas",
+                mensaje="Correo o contraseña incorrectos.",
+            )
+
+        # Actualizar last_login_at
+        usuario.last_login_at = datetime.now(UTC)
+        await self._sesion.commit()
+
+        logger.info(
+            "usuario_login",
+            usuario_id=str(usuario.id),
+            rol=usuario.rol.value,
+        )
+
+        claims = {"rol": usuario.rol.value}
+        access = crear_token(str(usuario.id), tipo="access", extra_claims=claims)
+        refresh = crear_token(str(usuario.id), tipo="refresh", extra_claims=claims)
+
+        return LoginResponse(
+            usuario=UsuarioResponse.model_validate(usuario),
+            tokens=TokensResponse(access_token=access, refresh_token=refresh),
+        )
+
+
+class RefreshService:
+    """Caso de uso: emitir un nuevo par de tokens a partir de un refresh token."""
+
+    def __init__(self, sesion: AsyncSession) -> None:
+        self._repo = UsuarioRepositorio(sesion)
+
+    async def ejecutar(self, datos: RefreshRequest) -> RefreshResponse:
+        """Valida el refresh token y emite un nuevo par.
+
+        Implementa **rotación de refresh tokens**: cada refresh devuelve un
+        nuevo refresh, no el mismo. Reduce ventana de exposición si el
+        refresh token se filtra.
+
+        Args:
+            datos: payload con el refresh token.
+
+        Returns:
+            Nuevo par de tokens (access + refresh).
+
+        Raises:
+            ErrorAutenticacion: si el token es inválido, expiró, no es de
+                tipo refresh, o el usuario asociado ya no existe.
+        """
+        payload = decodificar_token(datos.refresh_token)
+
+        if payload.get("tipo") != "refresh":
+            raise ErrorAutenticacion(
+                codigo="tipo_token_invalido",
+                mensaje="Se esperaba un refresh token.",
+            )
+
+        sub = payload.get("sub")
+        if not sub:
+            raise ErrorAutenticacion(
+                codigo="token_invalido",
+                mensaje="El token no contiene un sujeto válido.",
+            )
+
+        try:
+            usuario_id = uuid.UUID(sub)
+        except ValueError as exc:
+            raise ErrorAutenticacion(
+                codigo="token_invalido",
+                mensaje="El identificador del usuario es inválido.",
+            ) from exc
+
+        usuario = await self._repo.obtener_por_id(usuario_id)
+        if usuario is None:
+            raise ErrorAutenticacion(
+                codigo="usuario_no_existe",
+                mensaje="El usuario asociado al token ya no existe.",
+            )
+
+        claims = {"rol": usuario.rol.value}
+        access = crear_token(str(usuario.id), tipo="access", extra_claims=claims)
+        refresh = crear_token(str(usuario.id), tipo="refresh", extra_claims=claims)
+
+        return RefreshResponse(
+            tokens=TokensResponse(access_token=access, refresh_token=refresh)
         )

@@ -1,14 +1,54 @@
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { RutaProtegida } from "@/compartido/auth/RutaProtegida";
 import { RegistroPagina } from "@/usuarios/paginas/RegistroPagina";
+import { LoginPagina } from "@/usuarios/paginas/LoginPagina";
+import { InicioPagina } from "@/usuarios/paginas/InicioPagina";
+import { AgregarCartaPagina } from "@/catalogo/paginas/AgregarCartaPagina";
 
 /**
- * Componente raíz de la app.
+ * Rutas de la aplicación.
  *
- * Por ahora muestra directamente la página de registro porque es la única
- * pantalla del Sprint 1. Cuando agreguemos más páginas (login, catálogo,
- * etc.) introducimos react-router aquí.
+ * Públicas:
+ *   /             → redirect a /inicio (si hay sesión) o /login (si no)
+ *   /registro     → registro público (Submitter por default)
+ *   /login        → login
+ *
+ * Protegidas (cualquier rol autenticado):
+ *   /inicio       → landing post-login
+ *
+ * Protegidas (admin o superadmin):
+ *   /admin/cartas/nueva → agregar carta al catálogo
+ *
+ * Cualquier otra ruta cae al catch-all que redirige a /.
  */
-function App() {
-  return <RegistroPagina />;
-}
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/inicio" replace />} />
+        <Route path="/registro" element={<RegistroPagina />} />
+        <Route path="/login" element={<LoginPagina />} />
 
-export default App;
+        <Route
+          path="/inicio"
+          element={
+            <RutaProtegida>
+              <InicioPagina />
+            </RutaProtegida>
+          }
+        />
+
+        <Route
+          path="/admin/cartas/nueva"
+          element={
+            <RutaProtegida roles={["admin", "superadmin"]}>
+              <AgregarCartaPagina />
+            </RutaProtegida>
+          }
+        />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}

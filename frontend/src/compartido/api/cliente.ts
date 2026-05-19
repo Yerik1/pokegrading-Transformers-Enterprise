@@ -80,3 +80,18 @@ cliente.interceptors.response.use(
     );
   }
 );
+
+// === Interceptor: FormData ===
+// Cuando el body es FormData, axios necesita setear `Content-Type:
+// multipart/form-data; boundary=...` con un boundary autogenerado.
+// Si dejamos el default `application/json` activo, el browser/axios no
+// inyecta el boundary y el backend recibe un body inutilizable.
+// Solución: eliminamos el Content-Type para que axios lo deduzca solo.
+cliente.interceptors.request.use((config) => {
+  if (config.data instanceof FormData) {
+    if (config.headers) {
+      delete config.headers["Content-Type"];
+    }
+  }
+  return config;
+});

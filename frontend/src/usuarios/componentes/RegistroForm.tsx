@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { ErrorDominio, ErrorRed } from "@/compartido/api/errores";
 import { useAuthStore } from "@/compartido/auth/auth-store";
 import {
@@ -42,8 +43,8 @@ export function RegistroForm() {
   const [form, setForm] = useState<EstadoFormulario>(ESTADO_INICIAL);
   const [errores, setErrores] = useState<CamposError>({});
   const [enviando, setEnviando] = useState(false);
-  const [exito, setExito] = useState(false);
   const iniciarSesion = useAuthStore((s) => s.iniciarSesion);
+  const navegar = useNavigate();
 
   function actualizar<K extends keyof EstadoFormulario>(
     campo: K,
@@ -79,7 +80,7 @@ export function RegistroForm() {
         disclosure_aceptado: form.disclosure_aceptado,
       });
       iniciarSesion(resp.usuario, resp.tokens);
-      setExito(true);
+      navegar("/inicio", { replace: true });
     } catch (err) {
       if (err instanceof ErrorDominio) {
         const campo = (err.campo ?? "general") as keyof CamposError;
@@ -92,10 +93,6 @@ export function RegistroForm() {
     } finally {
       setEnviando(false);
     }
-  }
-
-  if (exito) {
-    return <PantallaExito alias={form.alias} />;
   }
 
   return (
@@ -315,35 +312,6 @@ function Campo({
           {error}
         </p>
       )}
-    </div>
-  );
-}
-
-function PantallaExito({ alias }: { alias: string }) {
-  return (
-    <div className="space-y-4 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-7 w-7 text-success"
-          aria-hidden="true"
-        >
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
-      </div>
-      <h2 className="font-display text-3xl tracking-tight-display text-ink">
-        Bienvenido, {alias}.
-      </h2>
-      <p className="text-ink-muted">
-        Tu cuenta está lista. En la siguiente iteración del Sprint vas a poder
-        empezar a evaluar tus cartas.
-      </p>
     </div>
   );
 }

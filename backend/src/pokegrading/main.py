@@ -16,10 +16,12 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from pokegrading.catalogo.router import router as catalogo_router
 from pokegrading.compartido.config import obtener_settings
 from pokegrading.compartido.correlation import CorrelationIdMiddleware
 from pokegrading.compartido.errores import registrar_handlers
 from pokegrading.compartido.logging import configurar_logging, obtener_logger
+from pokegrading.usuarios.router import auth_router
 from pokegrading.usuarios.router import router as usuarios_router
 
 configurar_logging()
@@ -62,6 +64,8 @@ def crear_app() -> FastAPI:
         return {"estado": "ok"}
 
     app.include_router(usuarios_router)
+    app.include_router(auth_router)
+    app.include_router(catalogo_router)
 
     logger.info("app_iniciada", version="0.1.0")
     return app
