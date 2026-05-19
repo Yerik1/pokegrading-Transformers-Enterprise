@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pokegrading-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pokegrading
+      POSTGRES_PASSWORD: pokegrading
+      POSTGRES_DB: pokegrading_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pokegrading_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pokegrading -d pokegrading_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Servicio backend opcional: usar solo cuando se quiera correr todo en docker.
+  # Día a día se levanta con `uvicorn --reload` fuera de docker para hot reload.
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pokegrading-api
+    profiles: ["full"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: dev
+      DATABASE_URL: postgresql+asyncpg://pokegrading:pokegrading@db:5432/pokegrading_dev
+      JWT_SECRET_KEY: cambiame-en-prod-este-es-un-secret-de-desarrollo-muy-largo
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_MINUTES: "15"
+      JWT_REFRESH_DAYS: "7"
+      LOG_LEVEL: INFO
+      DISCLOSURE_VERSION: v1.0
+    ports:
+      - "8000:8000"
+
+volumes:
+  pokegrading_db_data:
