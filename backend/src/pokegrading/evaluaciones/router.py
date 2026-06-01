@@ -5,11 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.compartido.almacenamiento import obtener_almacenamiento, IAlmacenamientoImagenes
+from pokegrading.compartido.almacenamiento import (
+    IAlmacenamientoImagenes,
+    obtener_almacenamiento,
+)
 from pokegrading.compartido.db import obtener_sesion
 from pokegrading.evaluaciones.schemas import EnviarCartaResponse
 from pokegrading.evaluaciones.servicio import EnviarCartaService
-from pokegrading.usuarios.dependencias import requerir_rol, usuario_actual
+from pokegrading.usuarios.dependencias import requerir_rol
 from pokegrading.usuarios.modelos import Usuario
 from pokegrading.usuarios.tipos import Rol
 
@@ -35,7 +38,9 @@ requerir_submitter_o_superior = requerir_rol(
 async def enviar_carta(
     request: Request,
     imagen_frente: UploadFile = File(..., description="Imagen del frente de la carta"),
-    imagen_reverso: UploadFile = File(..., description="Imagen del reverso de la carta"),
+    imagen_reverso: UploadFile = File(
+        ..., description="Imagen del reverso de la carta"
+    ),
     sesion: AsyncSession = Depends(obtener_sesion),
     almacenamiento: IAlmacenamientoImagenes = Depends(obtener_almacenamiento),
     usuario: Usuario = Depends(requerir_submitter_o_superior),

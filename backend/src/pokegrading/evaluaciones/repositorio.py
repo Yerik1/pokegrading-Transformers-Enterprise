@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.evaluaciones.modelos import Evaluacion
@@ -22,6 +20,7 @@ class EvaluacionRepositorio:
     async def contar_pendientes(self) -> int:
         """Cuenta evaluaciones en estado recibida o procesando."""
         from sqlalchemy import func, select
+
         stmt = select(func.count()).where(
             Evaluacion.estado.in_(["recibida", "procesando"])
         )

@@ -3,19 +3,18 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pokegrading.catalogo import reglas as reglas_imagen
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
-from pokegrading.compartido.config import obtener_settings
 from pokegrading.compartido.errores import ErrorValidacion
 from pokegrading.compartido.logging import obtener_logger
 from pokegrading.evaluaciones.modelos import Evaluacion
-from pokegrading.evaluaciones.reglas import calcular_iq_score, UMBRAL_IQS_DEFAULT
+from pokegrading.evaluaciones.reglas import UMBRAL_IQS_DEFAULT, calcular_iq_score
 from pokegrading.evaluaciones.repositorio import EvaluacionRepositorio
 from pokegrading.evaluaciones.schemas import EnviarCartaResponse
-from pokegrading.catalogo import reglas as reglas_imagen
 
 logger = obtener_logger(__name__)
 
@@ -31,7 +30,7 @@ _EXTENSION_POR_MIME: dict[str, str] = {
 
 def _generar_identificador(evaluacion_id: uuid.UUID) -> str:
     """Genera identificador legible tipo EV-2026-05-31-A1B3."""
-    hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    hoy = datetime.now(UTC).strftime("%Y-%m-%d")
     sufijo = str(evaluacion_id).upper().replace("-", "")[:4]
     return f"EV-{hoy}-{sufijo}"
 
@@ -188,9 +187,7 @@ class EnviarCartaService:
             created_at=evaluacion.created_at,
         )
 
-    async def _eliminar_blob_silencioso(
-        self, contenedor: str, clave: str
-    ) -> None:
+    async def _eliminar_blob_silencioso(self, contenedor: str, clave: str) -> None:
         """Limpieza compensatoria de blobs huérfanos."""
         try:
             await self._almacenamiento.eliminar(contenedor, clave)

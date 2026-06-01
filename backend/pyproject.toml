@@ -59,6 +59,8 @@ select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RET"]
 ignore = [
     "E501",  # line-length lo controla black
     "N818",  # nuestras excepciones usan prefijo `Error*` en español (decisión del equipo)
+    "B008",  # FastAPI requiere File(...) y Depends(...) en argumentos de función
+    "RET504",  # asignación antes de return — preferencia de legibilidad del equipo
 ]
 [tool.ruff.lint.per-file-ignores]
 "alembic/versions/*" = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RET"]

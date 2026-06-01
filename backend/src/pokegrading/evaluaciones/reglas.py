@@ -11,8 +11,9 @@ Umbral mínimo configurable, default 0.6.
 
 from __future__ import annotations
 
-import numpy as np
 from io import BytesIO
+
+import numpy as np
 from PIL import Image, ImageFilter
 
 from pokegrading.compartido.errores import ErrorValidacion
