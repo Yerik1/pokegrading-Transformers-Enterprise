@@ -32,7 +32,7 @@ class Evaluacion(Base):
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False
     )
     estado: Mapped[str] = mapped_column(
-        String(20), nullable=False, server_default="recibida"
+        String(20), nullable=False, server_default="pendiente"
     )
     url_imagen_frente: Mapped[str] = mapped_column(Text, nullable=False)
     clave_blob_frente: Mapped[str] = mapped_column(Text, nullable=False)

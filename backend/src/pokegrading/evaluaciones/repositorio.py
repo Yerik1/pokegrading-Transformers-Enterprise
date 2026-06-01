@@ -18,11 +18,11 @@ class EvaluacionRepositorio:
         self._sesion.add(evaluacion)
 
     async def contar_pendientes(self) -> int:
-        """Cuenta evaluaciones en estado recibida o procesando."""
+        """Cuenta evaluaciones en estado pendiente o procesando."""
         from sqlalchemy import func, select
 
         stmt = select(func.count()).where(
-            Evaluacion.estado.in_(["recibida", "procesando"])
+            Evaluacion.estado.in_(["pendiente", "procesando"])
         )
         resultado = await self._sesion.execute(stmt)
         return resultado.scalar_one()

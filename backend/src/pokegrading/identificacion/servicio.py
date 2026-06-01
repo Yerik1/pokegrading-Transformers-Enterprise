@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.catalogo.modelos import Carta
+from pokegrading.catalogo.reglas import TAMANO_MAXIMO_BYTES
 from pokegrading.compartido.errores import ErrorValidacion
 from pokegrading.compartido.logging import obtener_logger
 from pokegrading.identificacion.algoritmo import (
@@ -42,7 +43,21 @@ class BusquedaRapidaService:
         Raises:
             ErrorValidacion: si la imagen no se puede procesar para phash.
         """
-        # 1. Calcular phash de la imagen recibida
+        # 1. Validar imagen antes de procesar
+        if len(imagen_frente) == 0:
+            raise ErrorValidacion(
+                codigo="imagen_vacia",
+                mensaje="El archivo de imagen está vacío.",
+                campo="imagen_frente",
+            )
+        if len(imagen_frente) > TAMANO_MAXIMO_BYTES:
+            raise ErrorValidacion(
+                codigo="imagen_demasiado_grande",
+                mensaje="La imagen excede el tamaño máximo de 10 MB.",
+                campo="imagen_frente",
+            )
+
+        # 2. Calcular phash de la imagen recibida
         try:
             phash_consulta = calcular_phash(imagen_frente)
         except Exception as exc:

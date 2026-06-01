@@ -103,3 +103,13 @@ def requerir_rol(*roles: Rol):
 # Alias conveniente: la mayoría de endpoints "admin-only" aceptan ambos roles.
 # Uso: `Depends(requerir_admin_o_superadmin)`
 requerir_admin_o_superadmin = requerir_rol(Rol.ADMIN, Rol.SUPERADMIN)
+
+# Alias para endpoints accesibles por cualquier usuario autenticado.
+# Reutilizable en cualquier módulo sin redefinir la lista de roles.
+requerir_submitter_o_superior = requerir_rol(
+    Rol.SUBMITTER,
+    Rol.REVIEWER,
+    Rol.ADMIN,
+    Rol.SUPERADMIN,
+    Rol.B2B_SERVICE_ACCOUNT,
+)

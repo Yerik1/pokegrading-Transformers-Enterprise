@@ -66,3 +66,11 @@ def obtener_almacenamiento() -> IAlmacenamientoImagenes:
 
     settings = obtener_settings()
     return AlmacenamientoAzureBlob(settings.azure_storage_connection_string)
+
+
+# Mapeo MIME -> extensión para nombrar blobs de forma consistente.
+# Centralizado aquí para reutilizar en cualquier módulo que suba imágenes.
+EXTENSION_POR_MIME: dict[str, str] = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+}
