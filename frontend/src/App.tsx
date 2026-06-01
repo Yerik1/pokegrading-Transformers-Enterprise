@@ -4,6 +4,7 @@ import { RegistroPagina } from "@/usuarios/paginas/RegistroPagina";
 import { LoginPagina } from "@/usuarios/paginas/LoginPagina";
 import { InicioPagina } from "@/usuarios/paginas/InicioPagina";
 import { AgregarCartaPagina } from "@/catalogo/paginas/AgregarCartaPagina";
+import { EnviarCartaPagina } from "@/evaluaciones/paginas/EnviarCartaPagina";
 
 /**
  * Rutas de la aplicación.
@@ -43,6 +44,15 @@ export default function App() {
           element={
             <RutaProtegida roles={["admin", "superadmin"]}>
               <AgregarCartaPagina />
+            </RutaProtegida>
+          }
+        />
+
+        <Route
+          path="/evaluaciones/enviar"
+          element={
+            <RutaProtegida roles={["submitter", "reviewer", "admin", "superadmin", "b2b_service_account"]}>
+              <EnviarCartaPagina />
             </RutaProtegida>
           }
         />
