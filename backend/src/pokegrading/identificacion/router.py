@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pokegrading.catalogo.reglas import TAMANO_MAXIMO_BYTES
 from pokegrading.compartido.db import obtener_sesion
 from pokegrading.compartido.errores import ErrorValidacion
 from pokegrading.identificacion.schemas import BusquedaRapidaResponse
@@ -13,8 +14,6 @@ from pokegrading.usuarios.dependencias import requerir_rol
 from pokegrading.usuarios.tipos import Rol
 
 router = APIRouter(prefix="/api/v1/identificacion", tags=["identificacion"])
-
-TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024  # 10 MB
 
 requerir_submitter_o_superior = requerir_rol(
     Rol.SUBMITTER, Rol.REVIEWER, Rol.ADMIN, Rol.SUPERADMIN, Rol.B2B_SERVICE_ACCOUNT

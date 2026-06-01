@@ -109,9 +109,17 @@ class CrearCartaService:
             )
 
         # Sube frente primero; si falla, no hay nada que limpiar.
-        url_frente = await self._almacenamiento.guardar(
-            contenedor, clave_frente, imagen_frente, mime_frente
-        )
+        try:
+            url_frente = await self._almacenamiento.guardar(
+                contenedor, clave_frente, imagen_frente, mime_frente
+            )
+        except Exception as exc:
+            logger.error(
+                "error_subiendo_imagen_frente",
+                carta_id=str(carta_id),
+                clave=clave_frente,
+            )
+            raise exc
 
         url_reverso: str | None = None
         if imagen_reverso is not None and clave_reverso is not None and mime_reverso:

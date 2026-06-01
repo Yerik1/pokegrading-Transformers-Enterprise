@@ -128,9 +128,17 @@ class EnviarCartaService:
             f".{_EXTENSION_POR_MIME[mime_reverso]}"
         )
 
-        url_frente = await self._almacenamiento.guardar(
-            contenedor, clave_frente, imagen_frente, mime_frente
-        )
+        try:
+            url_frente = await self._almacenamiento.guardar(
+                contenedor, clave_frente, imagen_frente, mime_frente
+            )
+        except Exception as exc:
+            logger.error(
+                "error_subiendo_imagen_frente",
+                evaluacion_id=str(evaluacion_id),
+                clave=clave_frente,
+            )
+            raise exc
         try:
             url_reverso = await self._almacenamiento.guardar(
                 contenedor, clave_reverso, imagen_reverso, mime_reverso
