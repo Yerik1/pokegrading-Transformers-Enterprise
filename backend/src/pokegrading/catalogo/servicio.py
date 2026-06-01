@@ -21,10 +21,10 @@ from pokegrading.catalogo.modelos import Carta
 from pokegrading.catalogo.repositorio import CartaRepositorio
 from pokegrading.catalogo.schemas import CartaResponse, CrearCartaRequest
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
-from pokegrading.identificacion.algoritmo import calcular_phash
 from pokegrading.compartido.config import obtener_settings
 from pokegrading.compartido.errores import ErrorConflicto
 from pokegrading.compartido.logging import obtener_logger
+from pokegrading.identificacion.algoritmo import calcular_phash
 
 logger = obtener_logger(__name__)
 
