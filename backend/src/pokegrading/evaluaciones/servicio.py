@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.catalogo import reglas as reglas_imagen
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
+from pokegrading.compartido.almacenamiento.base import EXTENSION_POR_MIME
 from pokegrading.compartido.errores import ErrorValidacion
 from pokegrading.compartido.logging import obtener_logger
 from pokegrading.evaluaciones.modelos import Evaluacion
@@ -21,11 +22,6 @@ logger = obtener_logger(__name__)
 UMBRAL_SATURACION = 50
 TIEMPO_ESTIMADO_SATURACION_SEGUNDOS = 120
 CONTENEDOR_EVALUACIONES = "cartas-referencia"
-
-_EXTENSION_POR_MIME: dict[str, str] = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-}
 
 
 def _generar_identificador(evaluacion_id: uuid.UUID) -> str:
@@ -120,17 +116,24 @@ class EnviarCartaService:
         contenedor = CONTENEDOR_EVALUACIONES
 
         clave_frente = (
-            f"evaluaciones/{evaluacion_id}/frente"
-            f".{_EXTENSION_POR_MIME[mime_frente]}"
+            f"evaluaciones/{evaluacion_id}/frente" f".{EXTENSION_POR_MIME[mime_frente]}"
         )
         clave_reverso = (
             f"evaluaciones/{evaluacion_id}/reverso"
-            f".{_EXTENSION_POR_MIME[mime_reverso]}"
+            f".{EXTENSION_POR_MIME[mime_reverso]}"
         )
 
-        url_frente = await self._almacenamiento.guardar(
-            contenedor, clave_frente, imagen_frente, mime_frente
-        )
+        try:
+            url_frente = await self._almacenamiento.guardar(
+                contenedor, clave_frente, imagen_frente, mime_frente
+            )
+        except Exception as exc:
+            logger.error(
+                "error_subiendo_imagen_frente",
+                evaluacion_id=str(evaluacion_id),
+                clave=clave_frente,
+            )
+            raise exc
         try:
             url_reverso = await self._almacenamiento.guardar(
                 contenedor, clave_reverso, imagen_reverso, mime_reverso
@@ -144,7 +147,7 @@ class EnviarCartaService:
             id=evaluacion_id,
             identificador_evaluacion=identificador,
             submitter_id=submitter_id,
-            estado="recibida",
+            estado="pendiente",
             url_imagen_frente=url_frente,
             clave_blob_frente=clave_frente,
             url_imagen_reverso=url_reverso,
@@ -158,7 +161,7 @@ class EnviarCartaService:
         await self._sesion.commit()
 
         logger.info(
-            "evaluacion_recibida",
+            "evaluacion_pendiente",
             evaluacion_id=str(evaluacion_id),
             identificador=identificador,
             submitter_id=str(submitter_id),
@@ -168,7 +171,7 @@ class EnviarCartaService:
         )
 
         mensaje = (
-            f"Evaluación recibida correctamente. "
+            f"Evaluación registrada correctamente. "
             f"Tu identificador es {identificador}."
         )
         if saturado:
@@ -179,7 +182,7 @@ class EnviarCartaService:
 
         return EnviarCartaResponse(
             identificador_evaluacion=identificador,
-            estado="recibida",
+            estado="pendiente",
             iq_score_frente=iq_frente,
             iq_score_reverso=iq_reverso,
             mensaje=mensaje,

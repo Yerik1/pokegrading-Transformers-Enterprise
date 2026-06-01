@@ -12,15 +12,10 @@ from pokegrading.compartido.almacenamiento import (
 from pokegrading.compartido.db import obtener_sesion
 from pokegrading.evaluaciones.schemas import EnviarCartaResponse
 from pokegrading.evaluaciones.servicio import EnviarCartaService
-from pokegrading.usuarios.dependencias import requerir_rol
+from pokegrading.usuarios.dependencias import requerir_submitter_o_superior
 from pokegrading.usuarios.modelos import Usuario
-from pokegrading.usuarios.tipos import Rol
 
 router = APIRouter(prefix="/api/v1/evaluaciones", tags=["evaluaciones"])
-
-requerir_submitter_o_superior = requerir_rol(
-    Rol.SUBMITTER, Rol.REVIEWER, Rol.ADMIN, Rol.SUPERADMIN, Rol.B2B_SERVICE_ACCOUNT
-)
 
 
 @router.post(

@@ -21,6 +21,7 @@ from pokegrading.catalogo.modelos import Carta
 from pokegrading.catalogo.repositorio import CartaRepositorio
 from pokegrading.catalogo.schemas import CartaResponse, CrearCartaRequest
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
+from pokegrading.compartido.almacenamiento.base import EXTENSION_POR_MIME
 from pokegrading.compartido.config import obtener_settings
 from pokegrading.compartido.errores import ErrorConflicto
 from pokegrading.compartido.logging import obtener_logger
@@ -29,10 +30,6 @@ from pokegrading.identificacion.algoritmo import calcular_phash
 logger = obtener_logger(__name__)
 
 # Mapeo MIME -> extensión para nombrar los blobs de forma consistente
-_EXTENSION_POR_MIME: dict[str, str] = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-}
 
 
 class CrearCartaService:
@@ -101,17 +98,25 @@ class CrearCartaService:
         carta_id = uuid.uuid4()
         contenedor = obtener_settings().azure_blob_container_cartas
 
-        clave_frente = f"cartas/{carta_id}/frente.{_EXTENSION_POR_MIME[mime_frente]}"
+        clave_frente = f"cartas/{carta_id}/frente.{EXTENSION_POR_MIME[mime_frente]}"
         clave_reverso: str | None = None
         if mime_reverso is not None:
             clave_reverso = (
-                f"cartas/{carta_id}/reverso.{_EXTENSION_POR_MIME[mime_reverso]}"
+                f"cartas/{carta_id}/reverso.{EXTENSION_POR_MIME[mime_reverso]}"
             )
 
         # Sube frente primero; si falla, no hay nada que limpiar.
-        url_frente = await self._almacenamiento.guardar(
-            contenedor, clave_frente, imagen_frente, mime_frente
-        )
+        try:
+            url_frente = await self._almacenamiento.guardar(
+                contenedor, clave_frente, imagen_frente, mime_frente
+            )
+        except Exception as exc:
+            logger.error(
+                "error_subiendo_imagen_frente",
+                carta_id=str(carta_id),
+                clave=clave_frente,
+            )
+            raise exc
 
         url_reverso: str | None = None
         if imagen_reverso is not None and clave_reverso is not None and mime_reverso:

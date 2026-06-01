@@ -6,19 +6,11 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido.db import obtener_sesion
-from pokegrading.compartido.errores import ErrorValidacion
 from pokegrading.identificacion.schemas import BusquedaRapidaResponse
 from pokegrading.identificacion.servicio import BusquedaRapidaService
-from pokegrading.usuarios.dependencias import requerir_rol
-from pokegrading.usuarios.tipos import Rol
+from pokegrading.usuarios.dependencias import requerir_submitter_o_superior
 
 router = APIRouter(prefix="/api/v1/identificacion", tags=["identificacion"])
-
-TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024  # 10 MB
-
-requerir_submitter_o_superior = requerir_rol(
-    Rol.SUBMITTER, Rol.REVIEWER, Rol.ADMIN, Rol.SUPERADMIN, Rol.B2B_SERVICE_ACCOUNT
-)
 
 
 @router.post(
@@ -38,19 +30,5 @@ async def busqueda_rapida(
 ) -> BusquedaRapidaResponse:
     """Endpoint de búsqueda rápida de carta por phash."""
     contenido = await imagen_frente.read()
-
-    if len(contenido) == 0:
-        raise ErrorValidacion(
-            codigo="imagen_vacia",
-            mensaje="El archivo de imagen está vacío.",
-            campo="imagen_frente",
-        )
-    if len(contenido) > TAMANO_MAXIMO_BYTES:
-        raise ErrorValidacion(
-            codigo="imagen_demasiado_grande",
-            mensaje="La imagen excede el tamaño máximo de 10 MB.",
-            campo="imagen_frente",
-        )
-
     servicio = BusquedaRapidaService(sesion)
     return await servicio.ejecutar(contenido)

@@ -6,6 +6,18 @@ Decisiones (V6, SP8):
   estándar; ya validamos longitud razonable en `reglas.validar_password`).
 - JWT: `HS256` con secret de Key Vault en prod; access 15min, refresh 7 días.
 
+Flujo del Bearer Token:
+1. El cliente hace POST /api/v1/auth/login con correo+password.
+2. El backend valida credenciales y emite dos tokens:
+   - access_token (15 min): JWT firmado con HS256, contiene sub, rol, tipo=access.
+   - refresh_token (7 días): JWT firmado, tipo=refresh, usado para renovar el access.
+3. El cliente incluye el access_token en cada request protegido:
+   Authorization: Bearer <access_token>
+4. El middleware HTTPBearer extrae el token del header.
+5. `decodificar_token` valida firma, expiración y tipo.
+6. Si el access_token expira, el cliente usa POST /api/v1/auth/refresh con el
+   refresh_token para obtener un nuevo par de tokens (rotación en cada refresh).
+
 Las contraseñas en claro NUNCA se loguean ni se devuelven al cliente.
 """
 
