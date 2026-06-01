@@ -21,6 +21,7 @@ from pokegrading.catalogo.modelos import Carta
 from pokegrading.catalogo.repositorio import CartaRepositorio
 from pokegrading.catalogo.schemas import CartaResponse, CrearCartaRequest
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
+from pokegrading.identificacion.algoritmo import calcular_phash
 from pokegrading.compartido.config import obtener_settings
 from pokegrading.compartido.errores import ErrorConflicto
 from pokegrading.compartido.logging import obtener_logger
@@ -69,6 +70,12 @@ class CrearCartaService:
                 content_type_cliente=content_type_reverso or "application/octet-stream",
                 campo="imagen_reverso",
             )
+
+        # === 1b. Calcular phash del frente para búsqueda rápida ===
+        try:
+            phash_frente = calcular_phash(imagen_frente)
+        except Exception:
+            phash_frente = None
 
         # === 2. Verificar duplicado por identity tuple ===
         existente = await self._repo.obtener_por_identity_tuple(
@@ -137,6 +144,7 @@ class CrearCartaService:
             url_imagen_reverso=url_reverso,
             clave_blob_reverso=clave_reverso,
             creada_por_id=creada_por_id,
+            phash_frente=phash_frente,
         )
 
         try:

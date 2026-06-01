@@ -106,6 +106,9 @@ class Carta(Base):
     url_imagen_reverso: Mapped[str | None] = mapped_column(Text, nullable=True)
     clave_blob_reverso: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # === Identificación (búsqueda rápida) ===
+    phash_frente: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     # === Auditoría ===
     creada_por_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
