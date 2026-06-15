@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.catalogo import reglas as reglas_imagen
+from pokegrading.compartido import imagenes as reglas_imagen
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
 from pokegrading.compartido.almacenamiento.base import EXTENSION_POR_MIME
 from pokegrading.compartido.errores import ErrorValidacion
