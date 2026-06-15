@@ -14,10 +14,10 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from pokegrading.compartido.config import obtener_settings
-from pokegrading.compartido.db import Base
+from pokegrading.datos.db import Base
 
 # importar modelos para que estén registrados en Base.metadata
-from pokegrading.usuarios import modelos  # noqa: F401
+from pokegrading.negocio.usuarios import modelos  # noqa: F401
 
 config = context.config
 

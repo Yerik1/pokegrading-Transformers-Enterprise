@@ -21,10 +21,10 @@ from pokegrading.compartido.seguridad import (
     hashear_password,
     verificar_password,
 )
-from pokegrading.usuarios import reglas
-from pokegrading.usuarios.modelos import Usuario
-from pokegrading.usuarios.repositorio import UsuarioRepositorio
-from pokegrading.usuarios.schemas import (
+from pokegrading.negocio.usuarios import reglas
+from pokegrading.negocio.usuarios.modelos import Usuario
+from pokegrading.negocio.usuarios.repositorio import UsuarioRepositorio
+from pokegrading.compartido.schemas.usuarios import (
     LoginRequest,
     LoginResponse,
     RefreshRequest,
@@ -34,10 +34,16 @@ from pokegrading.usuarios.schemas import (
     TokensResponse,
     UsuarioResponse,
 )
-from pokegrading.usuarios.tipos import Rol
+from pokegrading.negocio.usuarios.tipos import Rol
 
 logger = obtener_logger(__name__)
 
+def _generar_par_tokens(usuario: Usuario) -> TokensResponse:
+    claims = {"rol": usuario.rol.value}
+    return TokensResponse(
+        access_token=crear_token(str(usuario.id), tipo="access", extra_claims=claims),
+        refresh_token=crear_token(str(usuario.id), tipo="refresh", extra_claims=claims),
+    )
 
 class RegistroService:
     """Caso de uso: registrar una nueva cuenta de Submitter."""
@@ -125,13 +131,11 @@ class RegistroService:
 
         # 4) Generar par de tokens iniciales (la US dice "cuenta activa de
         # inmediato": entregamos tokens junto con el registro).
-        claims = {"rol": nuevo.rol.value}
-        access = crear_token(str(nuevo.id), tipo="access", extra_claims=claims)
-        refresh = crear_token(str(nuevo.id), tipo="refresh", extra_claims=claims)
+        tokens = _generar_par_tokens(nuevo)
 
         return RegistroResponse(
             usuario=UsuarioResponse.model_validate(nuevo),
-            tokens=TokensResponse(access_token=access, refresh_token=refresh),
+            tokens=TokensResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token),
         )
 
 
@@ -183,13 +187,11 @@ class LoginService:
             rol=usuario.rol.value,
         )
 
-        claims = {"rol": usuario.rol.value}
-        access = crear_token(str(usuario.id), tipo="access", extra_claims=claims)
-        refresh = crear_token(str(usuario.id), tipo="refresh", extra_claims=claims)
+        tokens = _generar_par_tokens(usuario)
 
         return LoginResponse(
             usuario=UsuarioResponse.model_validate(usuario),
-            tokens=TokensResponse(access_token=access, refresh_token=refresh),
+            tokens=TokensResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token),
         )
 
 
@@ -246,10 +248,8 @@ class RefreshService:
                 mensaje="El usuario asociado al token ya no existe.",
             )
 
-        claims = {"rol": usuario.rol.value}
-        access = crear_token(str(usuario.id), tipo="access", extra_claims=claims)
-        refresh = crear_token(str(usuario.id), tipo="refresh", extra_claims=claims)
+        tokens = _generar_par_tokens(usuario)
 
         return RefreshResponse(
-            tokens=TokensResponse(access_token=access, refresh_token=refresh)
+            tokens=TokensResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token)
         )

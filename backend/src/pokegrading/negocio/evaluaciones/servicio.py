@@ -12,10 +12,11 @@ from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
 from pokegrading.compartido.almacenamiento.base import EXTENSION_POR_MIME
 from pokegrading.compartido.errores import ErrorValidacion
 from pokegrading.compartido.logging import obtener_logger
-from pokegrading.evaluaciones.modelos import Evaluacion
-from pokegrading.evaluaciones.reglas import UMBRAL_IQS_DEFAULT, calcular_iq_score
-from pokegrading.evaluaciones.repositorio import EvaluacionRepositorio
-from pokegrading.evaluaciones.schemas import EnviarCartaResponse
+from pokegrading.compartido.almacenamiento.base import eliminar_blob_silencioso
+from pokegrading.negocio.evaluaciones.modelos import Evaluacion
+from pokegrading.negocio.evaluaciones.reglas import UMBRAL_IQS_DEFAULT, calcular_iq_score
+from pokegrading.negocio.evaluaciones.repositorio import EvaluacionRepositorio
+from pokegrading.compartido.schemas.evaluaciones import EnviarCartaResponse
 
 logger = obtener_logger(__name__)
 
@@ -139,7 +140,7 @@ class EnviarCartaService:
                 contenedor, clave_reverso, imagen_reverso, mime_reverso
             )
         except Exception:
-            await self._eliminar_blob_silencioso(contenedor, clave_frente)
+            await eliminar_blob_silencioso(contenedor, clave_frente, logger)
             raise
 
         # === 5. Persistir evaluación ===
@@ -190,13 +191,3 @@ class EnviarCartaService:
             created_at=evaluacion.created_at,
         )
 
-    async def _eliminar_blob_silencioso(self, contenedor: str, clave: str) -> None:
-        """Limpieza compensatoria de blobs huérfanos."""
-        try:
-            await self._almacenamiento.eliminar(contenedor, clave)
-        except Exception:
-            logger.warning(
-                "blob_huerfano_no_eliminado",
-                contenedor=contenedor,
-                clave=clave,
-            )

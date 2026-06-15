@@ -12,7 +12,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.usuarios.modelos import Usuario
+from pokegrading.negocio.usuarios.modelos import Usuario
 
 
 class UsuarioRepositorio:

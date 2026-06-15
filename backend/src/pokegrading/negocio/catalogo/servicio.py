@@ -16,16 +16,17 @@ import uuid
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.catalogo import reglas
-from pokegrading.catalogo.modelos import Carta
-from pokegrading.catalogo.repositorio import CartaRepositorio
-from pokegrading.catalogo.schemas import CartaResponse, CrearCartaRequest
+from pokegrading.negocio.catalogo.modelos import Carta
+from pokegrading.negocio.catalogo.repositorio import CartaRepositorio
+from pokegrading.compartido.schemas.catalogo import CartaResponse, CrearCartaRequest
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
 from pokegrading.compartido.almacenamiento.base import EXTENSION_POR_MIME
 from pokegrading.compartido.config import obtener_settings
 from pokegrading.compartido.errores import ErrorConflicto
 from pokegrading.compartido.logging import obtener_logger
-from pokegrading.identificacion.algoritmo import calcular_phash
+from pokegrading.compartido.almacenamiento.base import eliminar_blob_silencioso
+from pokegrading.compartido.imagenes import validar_imagen
+from pokegrading.negocio.identificacion.algoritmo import calcular_phash
 
 logger = obtener_logger(__name__)
 
@@ -55,14 +56,14 @@ class CrearCartaService:
         creada_por_id: uuid.UUID,
     ) -> CartaResponse:
         # === 1. Validar imágenes ===
-        mime_frente = reglas.validar_imagen(
+        mime_frente = validar_imagen(
             imagen_frente,
             content_type_cliente=content_type_frente,
             campo="imagen_frente",
         )
         mime_reverso: str | None = None
         if imagen_reverso is not None:
-            mime_reverso = reglas.validar_imagen(
+            mime_reverso = validar_imagen(
                 imagen_reverso,
                 content_type_cliente=content_type_reverso or "application/octet-stream",
                 campo="imagen_reverso",
@@ -127,7 +128,7 @@ class CrearCartaService:
             except Exception:
                 # Limpieza compensatoria: borramos el frente que ya subimos
                 # antes de propagar la excepción.
-                await self._eliminar_blob_silencioso(contenedor, clave_frente)
+                await eliminar_blob_silencioso(contenedor, clave_frente, logger)
                 raise
 
         # === 4. Persistir en BD ===
@@ -159,9 +160,9 @@ class CrearCartaService:
             # Race condition: otro request creó la misma identity tuple
             # entre nuestra verificación y el insert. Rollback BD + limpiar blobs.
             await self._sesion.rollback()
-            await self._eliminar_blob_silencioso(contenedor, clave_frente)
+            await eliminar_blob_silencioso(contenedor, clave_frente, logger)
             if clave_reverso is not None:
-                await self._eliminar_blob_silencioso(contenedor, clave_reverso)
+                await eliminar_blob_silencioso(contenedor, clave_reverso)
             raise ErrorConflicto(
                 codigo="carta_duplicada",
                 mensaje="Ya existe una carta con la misma identidad.",
@@ -181,18 +182,3 @@ class CrearCartaService:
 
         return CartaResponse.model_validate(nueva)
 
-    async def _eliminar_blob_silencioso(self, contenedor: str, clave: str) -> None:
-        """Intenta eliminar un blob para limpieza compensatoria.
-
-        Si la eliminación falla (red caída, etc.), se loguea pero no se
-        propaga: el rollback del BD es lo prioritario. Los blobs huérfanos
-        que queden se limpian con un job de mantenimiento periódico.
-        """
-        try:
-            await self._almacenamiento.eliminar(contenedor, clave)
-        except Exception:
-            logger.warning(
-                "blob_huerfano_no_eliminado",
-                contenedor=contenedor,
-                clave=clave,
-            )

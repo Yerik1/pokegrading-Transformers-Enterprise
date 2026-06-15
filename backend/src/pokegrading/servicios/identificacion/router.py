@@ -5,10 +5,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.compartido.db import obtener_sesion
-from pokegrading.identificacion.schemas import BusquedaRapidaResponse
-from pokegrading.identificacion.servicio import BusquedaRapidaService
-from pokegrading.usuarios.dependencias import requerir_submitter_o_superior
+from pokegrading.datos.db import obtener_sesion
+from pokegrading.compartido.schemas.identificacion import BusquedaRapidaResponse
+from pokegrading.negocio.identificacion.servicio import BusquedaRapidaService
+from pokegrading.compartido.dependencias import requerir_submitter_o_superior
 
 router = APIRouter(prefix="/api/v1/identificacion", tags=["identificacion"])
 

@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pokegrading.catalogo.tipos import (
+from pokegrading.negocio.catalogo.tipos import (
     Acabado,
     Edicion,
     IdiomaCarta,

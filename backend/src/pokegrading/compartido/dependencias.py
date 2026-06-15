@@ -14,12 +14,12 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.compartido.db import obtener_sesion
+from pokegrading.datos.db import obtener_sesion
 from pokegrading.compartido.errores import ErrorAutenticacion, ErrorAutorizacion
 from pokegrading.compartido.seguridad import decodificar_token
-from pokegrading.usuarios.modelos import Usuario
-from pokegrading.usuarios.repositorio import UsuarioRepositorio
-from pokegrading.usuarios.tipos import Rol
+from pokegrading.negocio.usuarios.modelos import Usuario
+from pokegrading.negocio.usuarios.repositorio import UsuarioRepositorio
+from pokegrading.negocio.usuarios.tipos import Rol
 
 _bearer = HTTPBearer(auto_error=False)
 

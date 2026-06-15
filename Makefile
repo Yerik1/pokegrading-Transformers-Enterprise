@@ -78,7 +78,7 @@ db-reset:  ## Borra el volumen de Postgres y vuelve a aplicar migraciones (destr
 	$(MAKE) migrate
 
 db-shell:  ## Abre psql contra la BD de dev
-	docker compose exec db psql -U pokegrading -d pokegrading
+	docker compose exec db psql -U pokegrading -d pokegrading_dev
 
 wait-db:  ## Espera hasta 10s a que Postgres esté listo
 	@for i in 1 2 3 4 5 6 7 8 9 10; do \

@@ -12,7 +12,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from pokegrading.usuarios.tipos import Idioma, Pais, Rol
+from pokegrading.negocio.usuarios.tipos import Idioma, Pais, Rol
 
 
 class RegistroRequest(BaseModel):

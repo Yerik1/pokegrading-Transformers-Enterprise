@@ -5,16 +5,16 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.catalogo.modelos import Carta
+from pokegrading.negocio.catalogo.modelos import Carta
 from pokegrading.compartido.imagenes import validar_imagen
 from pokegrading.compartido.errores import ErrorValidacion
 from pokegrading.compartido.logging import obtener_logger
-from pokegrading.identificacion.algoritmo import (
+from pokegrading.negocio.identificacion.algoritmo import (
     UMBRAL_ACEPTACION_AUTO,
     buscar_candidatos,
     calcular_phash,
 )
-from pokegrading.identificacion.schemas import (
+from pokegrading.compartido.schemas.identificacion import (
     BusquedaRapidaResponse,
     CandidatoResponse,
 )
