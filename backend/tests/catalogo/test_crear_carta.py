@@ -20,8 +20,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido.seguridad import crear_token, hashear_password
-from pokegrading.usuarios.modelos import Usuario
-from pokegrading.usuarios.tipos import Idioma, Pais, Rol
+from pokegrading.negocio.usuarios.modelos import Usuario
+from pokegrading.negocio.usuarios.tipos import Idioma, Pais, Rol
 
 
 async def _crear_admin_directo(sesion: AsyncSession, rol: Rol = Rol.ADMIN) -> Usuario:
