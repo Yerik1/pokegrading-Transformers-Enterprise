@@ -87,6 +87,7 @@ def _carta(sesion: AsyncSession, set_codigo: str = "BASE1", numero: str = "4") -
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 async def cuenta_activa(sesion: AsyncSession):
     """Crea un usuario B2B y su cuenta activa en BD."""
@@ -108,6 +109,7 @@ async def carta_en_catalogo(sesion: AsyncSession):
 # ---------------------------------------------------------------------------
 # Tests: autenticación
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_api_key_invalida_devuelve_401(
@@ -153,6 +155,7 @@ async def test_cuenta_suspendida_devuelve_401(
 # ---------------------------------------------------------------------------
 # Tests: lookup
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_carta_cubierta(
@@ -224,15 +227,23 @@ async def test_multiples_coincidencias(
     """Sin filtrar por edicion/idioma/acabado, pueden existir múltiples coincidencias."""
     # Insertar dos cartas con mismo set/numero pero distinto acabado
     c1 = Carta(
-        set_codigo="SWSH01", numero="1",
-        edicion=Edicion.UNLIMITED, idioma=IdiomaCarta.EN, acabado=Acabado.HOLO,
-        url_imagen_frente="https://blob.test/1.jpg", clave_blob_frente="t/1.jpg",
+        set_codigo="SWSH01",
+        numero="1",
+        edicion=Edicion.UNLIMITED,
+        idioma=IdiomaCarta.EN,
+        acabado=Acabado.HOLO,
+        url_imagen_frente="https://blob.test/1.jpg",
+        clave_blob_frente="t/1.jpg",
         creada_por_id=uuid.uuid4(),
     )
     c2 = Carta(
-        set_codigo="SWSH01", numero="1",
-        edicion=Edicion.UNLIMITED, idioma=IdiomaCarta.EN, acabado=Acabado.NON_HOLO,
-        url_imagen_frente="https://blob.test/2.jpg", clave_blob_frente="t/2.jpg",
+        set_codigo="SWSH01",
+        numero="1",
+        edicion=Edicion.UNLIMITED,
+        idioma=IdiomaCarta.EN,
+        acabado=Acabado.NON_HOLO,
+        url_imagen_frente="https://blob.test/2.jpg",
+        clave_blob_frente="t/2.jpg",
         creada_por_id=uuid.uuid4(),
     )
     sesion.add_all([c1, c2])
@@ -256,6 +267,7 @@ async def test_multiples_coincidencias(
 # Tests: idempotencia
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_reintento_idempotente_devuelve_misma_respuesta(
     cliente: AsyncClient,
@@ -268,8 +280,12 @@ async def test_reintento_idempotente_devuelve_misma_respuesta(
     }
     headers = {"X-Api-Key": _API_KEY_VALIDA}
 
-    res1 = await cliente.post("/api/b2b/v1/catalogo/lookup", json=payload, headers=headers)
-    res2 = await cliente.post("/api/b2b/v1/catalogo/lookup", json=payload, headers=headers)
+    res1 = await cliente.post(
+        "/api/b2b/v1/catalogo/lookup", json=payload, headers=headers
+    )
+    res2 = await cliente.post(
+        "/api/b2b/v1/catalogo/lookup", json=payload, headers=headers
+    )
 
     assert res1.status_code == 200
     assert res2.status_code == 200
@@ -282,6 +298,7 @@ async def test_reintento_idempotente_devuelve_misma_respuesta(
 # ---------------------------------------------------------------------------
 # Tests: rate limiting
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_rate_limit_excedido_devuelve_429(

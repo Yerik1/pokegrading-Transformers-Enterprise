@@ -19,6 +19,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from pokegrading.compartido.schemas.schemas import (
+    AtributosCartaB2B,
+    CartaConsultaItem,
+    LookupRequest,
+    LookupResponse,
+    ResultadoCartaB2B,
+)
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,13 +35,6 @@ from pokegrading.compartido.errores import (
 )
 from pokegrading.compartido.logging import obtener_logger
 from pokegrading.negocio.b2b.repositorio import B2BRepositorio
-from pokegrading.negocio.b2b.schemas import (
-    AtributosCartaB2B,
-    CartaConsultaItem,
-    LookupRequest,
-    LookupResponse,
-    ResultadoCartaB2B,
-)
 from pokegrading.negocio.b2b.seguridad import hashear_api_key
 from pokegrading.negocio.catalogo.modelos import Carta
 from pokegrading.negocio.catalogo.tipos import Acabado, Edicion, IdiomaCarta
@@ -117,7 +117,9 @@ class LookupB2BService:
                     idempotency_key=payload.identificador_solicitud,
                     correlation_id=correlation_id,
                 )
-                respuesta = LookupResponse.model_validate_json(registro_previo.respuesta_json)
+                respuesta = LookupResponse.model_validate_json(
+                    registro_previo.respuesta_json
+                )
                 respuesta.es_reintento = True
                 respuesta.correlation_id = correlation_id
                 return respuesta
@@ -134,9 +136,24 @@ class LookupB2BService:
         if consumido + cartas_solicitadas > cuenta.limite_cartas_mes:
             # Calcular cuándo reintentar: inicio del próximo mes
             if ahora.month == 12:
-                reintentar = ahora.replace(year=ahora.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                reintentar = ahora.replace(
+                    year=ahora.year + 1,
+                    month=1,
+                    day=1,
+                    hour=0,
+                    minute=0,
+                    second=0,
+                    microsecond=0,
+                )
             else:
-                reintentar = ahora.replace(month=ahora.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                reintentar = ahora.replace(
+                    month=ahora.month + 1,
+                    day=1,
+                    hour=0,
+                    minute=0,
+                    second=0,
+                    microsecond=0,
+                )
 
             logger.warning(
                 "b2b_rate_limit_excedido",

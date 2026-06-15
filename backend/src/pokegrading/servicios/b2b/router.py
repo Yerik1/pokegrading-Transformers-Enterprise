@@ -22,10 +22,10 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request, status
+from pokegrading.compartido.schemas.schemas import LookupRequest, LookupResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.datos.db import obtener_sesion
-from pokegrading.negocio.b2b.schemas import LookupRequest, LookupResponse
 from pokegrading.negocio.b2b.servicio import LookupB2BService
 
 router = APIRouter(prefix="/api/b2b/v1", tags=["b2b"])

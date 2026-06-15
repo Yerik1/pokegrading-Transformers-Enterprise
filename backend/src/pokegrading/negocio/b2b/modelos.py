@@ -54,7 +54,9 @@ class B2BCuenta(Base):
     nombre_tienda: Mapped[str] = mapped_column(String(200), nullable=False)
 
     # Hash SHA-256 de la API key (NUNCA la clave en claro — DA-12)
-    api_key_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    api_key_hash: Mapped[str] = mapped_column(
+        String(64), nullable=False, unique=True, index=True
+    )
 
     # Prefijo público (primeros 8 chars) para identificación en dashboards
     api_key_prefijo: Mapped[str] = mapped_column(String(8), nullable=False)
@@ -95,7 +97,9 @@ class B2BCuenta(Base):
     )
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<B2BCuenta id={self.id} tienda={self.nombre_tienda} activa={self.activa}>"
+        return (
+            f"<B2BCuenta id={self.id} tienda={self.nombre_tienda} activa={self.activa}>"
+        )
 
 
 class B2BConsultaAuditoria(Base):

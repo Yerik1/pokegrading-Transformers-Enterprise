@@ -92,18 +92,22 @@ class B2BRepositorio:
         Usa INSERT ... ON CONFLICT DO UPDATE para ser atómico y evitar race conditions.
         """
         nuevo_id = uuid.uuid4()
-        stmt = pg_insert(B2BRateLimit).values(
-            id=nuevo_id,
-            cuenta_id=cuenta_id,
-            anio=anio,
-            mes=mes,
-            cartas_consultadas=cantidad,
-        ).on_conflict_do_update(
-            constraint="uq_b2b_rate_limit_mes",
-            set_={
-                "cartas_consultadas": B2BRateLimit.cartas_consultadas + cantidad,
-                "updated_at": datetime.now(UTC),
-            },
+        stmt = (
+            pg_insert(B2BRateLimit)
+            .values(
+                id=nuevo_id,
+                cuenta_id=cuenta_id,
+                anio=anio,
+                mes=mes,
+                cartas_consultadas=cantidad,
+            )
+            .on_conflict_do_update(
+                constraint="uq_b2b_rate_limit_mes",
+                set_={
+                    "cartas_consultadas": B2BRateLimit.cartas_consultadas + cantidad,
+                    "updated_at": datetime.now(UTC),
+                },
+            )
         )
         await self._sesion.execute(stmt)
 

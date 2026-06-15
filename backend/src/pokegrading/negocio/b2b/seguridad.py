@@ -1,4 +1,3 @@
-
 """Helpers de seguridad para el módulo B2B.
 
 La API key se maneja siguiendo el diseño de datos sensibles (DA-12, SP8):

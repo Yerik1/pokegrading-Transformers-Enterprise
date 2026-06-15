@@ -72,7 +72,9 @@ class ErrorConflicto(ErrorDominio):
 
 class ErrorRateLimit(ErrorDominio):
     """Cuota excedida — reintentar más tarde."""
+
     http_status = status.HTTP_429_TOO_MANY_REQUESTS
+
 
 class ErrorNoEncontrado(ErrorDominio):
     """Recurso solicitado no existe."""
