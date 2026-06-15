@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, UploadFile
-from pokegrading.compartido.dependencias import requerir_submitter_o_superior
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pokegrading.compartido.dependencias import requerir_submitter_o_superior
 from pokegrading.compartido.schemas.identificacion import BusquedaRapidaResponse
 from pokegrading.datos.db import obtener_sesion
 from pokegrading.negocio.identificacion.servicio import BusquedaRapidaService

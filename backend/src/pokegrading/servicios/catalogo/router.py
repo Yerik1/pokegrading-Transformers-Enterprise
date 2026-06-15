@@ -10,7 +10,6 @@ import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
-from pokegrading.compartido.dependencias import requerir_admin_o_superadmin
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +17,7 @@ from pokegrading.compartido.almacenamiento import (
     IAlmacenamientoImagenes,
     obtener_almacenamiento,
 )
+from pokegrading.compartido.dependencias import requerir_admin_o_superadmin
 from pokegrading.compartido.errores import ErrorValidacion
 from pokegrading.compartido.schemas.catalogo import CartaResponse, CrearCartaRequest
 from pokegrading.datos.db import obtener_sesion
