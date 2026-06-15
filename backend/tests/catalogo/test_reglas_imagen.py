@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from pokegrading.compartido.errores import ErrorValidacion
-from pokegrading.negocio.catalogo import reglas
+from pokegrading.compartido import imagenes as reglas
 
 
 def test_jpeg_valida_devuelve_mime(imagen_jpeg_valida: bytes) -> None:
