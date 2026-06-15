@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from pokegrading.catalogo import reglas
+from pokegrading.compartido import imagenes as reglas
 from pokegrading.compartido.errores import ErrorValidacion
 
 

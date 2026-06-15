@@ -78,7 +78,7 @@ db-reset:  ## Borra el volumen de Postgres y vuelve a aplicar migraciones (destr
 	$(MAKE) migrate
 
 db-shell:  ## Abre psql contra la BD de dev
-	docker compose exec db psql -U pokegrading -d pokegrading
+	docker compose exec db psql -U pokegrading -d pokegrading_dev
 
 wait-db:  ## Espera hasta 10s a que Postgres esté listo
 	@for i in 1 2 3 4 5 6 7 8 9 10; do \
@@ -138,13 +138,16 @@ format:  ## Aplica formato y arregla fixes de lint en el backend
 # BACKEND - SCRIPTS / CLI
 # =============================================================================
 
-.PHONY: crear-admin azure-check
+.PHONY: crear-admin azure-check b2b-cuenta
 
 crear-admin:  ## Crea un usuario admin/superadmin. Uso: make crear-admin ARGS="--correo X --alias Y --rol superadmin"
 	cd $(BACKEND_DIR) && "$(PYTHON)" -m scripts.crear_admin $(ARGS)
 
 azure-check:  ## Verifica que la conexión a Azure Blob Storage funciona
 	cd $(BACKEND_DIR) && "$(PYTHON)" -m scripts.verificar_azure
+
+b2b-cuenta:  ## Crea cuenta B2B con API key. Uso: make b2b-cuenta ARGS="--tienda 'Nombre' --correo x@ejemplo.com"
+	cd $(BACKEND_DIR) && "$(PYTHON)" -m scripts.crear_cuenta_b2b $(ARGS)
 
 # =============================================================================
 # FRONTEND
