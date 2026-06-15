@@ -195,4 +195,3 @@ class EnviarCartaService:
             tiempo_estimado_segundos=tiempo_estimado,
             created_at=evaluacion.created_at,
         )
-

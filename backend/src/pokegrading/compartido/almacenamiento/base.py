@@ -67,6 +67,7 @@ def obtener_almacenamiento() -> IAlmacenamientoImagenes:
     settings = obtener_settings()
     return AlmacenamientoAzureBlob(settings.azure_storage_connection_string)
 
+
 # compartido/almacenamiento/base.py
 async def eliminar_blob_silencioso(
     almacenamiento: IAlmacenamientoImagenes,
@@ -78,6 +79,7 @@ async def eliminar_blob_silencioso(
         await almacenamiento.eliminar(contenedor, clave)
     except Exception:
         logger.warning("blob_huerfano_no_eliminado", contenedor=contenedor, clave=clave)
+
 
 # Mapeo MIME -> extensión para nombrar blobs de forma consistente.
 # Centralizado aquí para reutilizar en cualquier módulo que suba imágenes.

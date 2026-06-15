@@ -38,12 +38,14 @@ from pokegrading.negocio.usuarios.tipos import Rol
 
 logger = obtener_logger(__name__)
 
+
 def _generar_par_tokens(usuario: Usuario) -> TokensResponse:
     claims = {"rol": usuario.rol.value}
     return TokensResponse(
         access_token=crear_token(str(usuario.id), tipo="access", extra_claims=claims),
         refresh_token=crear_token(str(usuario.id), tipo="refresh", extra_claims=claims),
     )
+
 
 class RegistroService:
     """Caso de uso: registrar una nueva cuenta de Submitter."""
@@ -135,7 +137,9 @@ class RegistroService:
 
         return RegistroResponse(
             usuario=UsuarioResponse.model_validate(nuevo),
-            tokens=TokensResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token),
+            tokens=TokensResponse(
+                access_token=tokens.access_token, refresh_token=tokens.refresh_token
+            ),
         )
 
 
@@ -191,7 +195,9 @@ class LoginService:
 
         return LoginResponse(
             usuario=UsuarioResponse.model_validate(usuario),
-            tokens=TokensResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token),
+            tokens=TokensResponse(
+                access_token=tokens.access_token, refresh_token=tokens.refresh_token
+            ),
         )
 
 
@@ -251,5 +257,7 @@ class RefreshService:
         tokens = _generar_par_tokens(usuario)
 
         return RefreshResponse(
-            tokens=TokensResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token)
+            tokens=TokensResponse(
+                access_token=tokens.access_token, refresh_token=tokens.refresh_token
+            )
         )

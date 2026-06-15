@@ -183,4 +183,3 @@ class CrearCartaService:
         )
 
         return CartaResponse.model_validate(nueva)
-
