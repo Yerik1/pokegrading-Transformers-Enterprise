@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile
+from pokegrading.compartido.dependencias import requerir_submitter_o_superior
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido.almacenamiento import (
     IAlmacenamientoImagenes,
     obtener_almacenamiento,
 )
-from pokegrading.compartido.dependencias import requerir_submitter_o_superior
 from pokegrading.compartido.schemas.evaluaciones import EnviarCartaResponse
 from pokegrading.datos.db import obtener_sesion
 from pokegrading.negocio.evaluaciones.servicio import EnviarCartaService
