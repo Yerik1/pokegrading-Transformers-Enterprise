@@ -13,8 +13,8 @@ from sqlalchemy import Boolean, DateTime, Enum, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from pokegrading.compartido.db import Base
-from pokegrading.usuarios.tipos import Idioma, Pais, Rol
+from pokegrading.datos.db import Base
+from pokegrading.negocio.usuarios.tipos import Idioma, Pais, Rol
 
 
 class Usuario(Base):

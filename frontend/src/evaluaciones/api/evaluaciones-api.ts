@@ -33,11 +33,7 @@ export async function enviarCartaApi(
   const form = new FormData();
   form.append("imagen_frente", imagenFrente);
   form.append("imagen_reverso", imagenReverso);
-  const res = await cliente.post<EnviarCartaResponse>(
-    "/api/v1/evaluaciones/enviar",
-    form,
-    { headers: { "Content-Type": "multipart/form-data" } }
-  );
+  const res = await cliente.post<EnviarCartaResponse>("/api/v1/evaluaciones/enviar", form);
   return res.data;
 }
 
@@ -46,10 +42,6 @@ export async function busquedaRapidaApi(
 ): Promise<BusquedaRapidaResponse> {
   const form = new FormData();
   form.append("imagen_frente", imagenFrente);
-  const res = await cliente.post<BusquedaRapidaResponse>(
-    "/api/v1/identificacion/busqueda-rapida",
-    form,
-    { headers: { "Content-Type": "multipart/form-data" } }
-  );
+  const res = await cliente.post<BusquedaRapidaResponse>("/api/v1/identificacion/busqueda-rapida", form);
   return res.data;
 }

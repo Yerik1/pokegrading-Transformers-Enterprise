@@ -7,8 +7,8 @@ import uuid
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.catalogo.modelos import Carta
-from pokegrading.catalogo.tipos import Acabado, Edicion, IdiomaCarta
+from pokegrading.negocio.catalogo.modelos import Carta
+from pokegrading.negocio.catalogo.tipos import Acabado, Edicion, IdiomaCarta
 
 
 class CartaRepositorio:

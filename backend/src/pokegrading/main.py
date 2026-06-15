@@ -16,15 +16,15 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from pokegrading.catalogo.router import router as catalogo_router
 from pokegrading.compartido.config import obtener_settings
 from pokegrading.compartido.correlation import CorrelationIdMiddleware
 from pokegrading.compartido.errores import registrar_handlers
 from pokegrading.compartido.logging import configurar_logging, obtener_logger
-from pokegrading.evaluaciones.router import router as evaluaciones_router
-from pokegrading.identificacion.router import router as identificacion_router
-from pokegrading.usuarios.router import auth_router
-from pokegrading.usuarios.router import router as usuarios_router
+from pokegrading.servicios.catalogo.router import router as catalogo_router
+from pokegrading.servicios.evaluaciones.router import router as evaluaciones_router
+from pokegrading.servicios.identificacion.router import router as identificacion_router
+from pokegrading.servicios.usuarios.router import auth_router
+from pokegrading.servicios.usuarios.router import router as usuarios_router
 
 configurar_logging()
 logger = obtener_logger(__name__)

@@ -5,18 +5,18 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.catalogo.modelos import Carta
-from pokegrading.catalogo.reglas import TAMANO_MAXIMO_BYTES
 from pokegrading.compartido.errores import ErrorValidacion
+from pokegrading.compartido.imagenes import validar_imagen
 from pokegrading.compartido.logging import obtener_logger
-from pokegrading.identificacion.algoritmo import (
+from pokegrading.compartido.schemas.identificacion import (
+    BusquedaRapidaResponse,
+    CandidatoResponse,
+)
+from pokegrading.negocio.catalogo.modelos import Carta
+from pokegrading.negocio.identificacion.algoritmo import (
     UMBRAL_ACEPTACION_AUTO,
     buscar_candidatos,
     calcular_phash,
-)
-from pokegrading.identificacion.schemas import (
-    BusquedaRapidaResponse,
-    CandidatoResponse,
 )
 
 logger = obtener_logger(__name__)
@@ -44,18 +44,7 @@ class BusquedaRapidaService:
             ErrorValidacion: si la imagen no se puede procesar para phash.
         """
         # 1. Validar imagen antes de procesar
-        if len(imagen_frente) == 0:
-            raise ErrorValidacion(
-                codigo="imagen_vacia",
-                mensaje="El archivo de imagen está vacío.",
-                campo="imagen_frente",
-            )
-        if len(imagen_frente) > TAMANO_MAXIMO_BYTES:
-            raise ErrorValidacion(
-                codigo="imagen_demasiado_grande",
-                mensaje="La imagen excede el tamaño máximo de 10 MB.",
-                campo="imagen_frente",
-            )
+        validar_imagen(imagen_frente, content_type_cliente="", campo="imagen_frente")
 
         # 2. Calcular phash de la imagen recibida
         try:

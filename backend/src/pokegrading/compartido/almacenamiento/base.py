@@ -6,7 +6,7 @@ Las claves se organizan jerárquicamente con `/` como separador
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pokegrading.compartido.config import obtener_settings
 
@@ -66,6 +66,19 @@ def obtener_almacenamiento() -> IAlmacenamientoImagenes:
 
     settings = obtener_settings()
     return AlmacenamientoAzureBlob(settings.azure_storage_connection_string)
+
+
+# compartido/almacenamiento/base.py
+async def eliminar_blob_silencioso(
+    almacenamiento: IAlmacenamientoImagenes,
+    contenedor: str,
+    clave: str,
+    logger: Any,
+) -> None:
+    try:
+        await almacenamiento.eliminar(contenedor, clave)
+    except Exception:
+        logger.warning("blob_huerfano_no_eliminado", contenedor=contenedor, clave=clave)
 
 
 # Mapeo MIME -> extensión para nombrar blobs de forma consistente.

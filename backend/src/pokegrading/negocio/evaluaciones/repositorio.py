@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.evaluaciones.modelos import Evaluacion
+from pokegrading.negocio.evaluaciones.modelos import Evaluacion
 
 
 class EvaluacionRepositorio:
