@@ -20,6 +20,7 @@ from pokegrading.compartido.config import obtener_settings
 from pokegrading.compartido.correlation import CorrelationIdMiddleware
 from pokegrading.compartido.errores import registrar_handlers
 from pokegrading.compartido.logging import configurar_logging, obtener_logger
+from pokegrading.servicios.b2b.router import router as b2b_router
 from pokegrading.servicios.catalogo.router import router as catalogo_router
 from pokegrading.servicios.evaluaciones.router import router as evaluaciones_router
 from pokegrading.servicios.identificacion.router import router as identificacion_router
@@ -67,6 +68,7 @@ def crear_app() -> FastAPI:
 
     app.include_router(usuarios_router)
     app.include_router(auth_router)
+    app.include_router(b2b_router)
     app.include_router(catalogo_router)
     app.include_router(evaluaciones_router)
     app.include_router(identificacion_router)
