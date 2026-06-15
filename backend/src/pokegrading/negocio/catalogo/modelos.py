@@ -25,6 +25,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from pokegrading.datos.db import Base
 from pokegrading.negocio.catalogo.tipos import (
     Acabado,
     Edicion,
@@ -32,7 +33,6 @@ from pokegrading.negocio.catalogo.tipos import (
     Rareza,
     TipoPokemon,
 )
-from pokegrading.datos.db import Base
 
 
 class Carta(Base):

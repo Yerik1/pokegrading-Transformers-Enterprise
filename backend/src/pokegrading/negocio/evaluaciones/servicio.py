@@ -9,14 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido import imagenes as reglas_imagen
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
-from pokegrading.compartido.almacenamiento.base import EXTENSION_POR_MIME
+from pokegrading.compartido.almacenamiento.base import (
+    EXTENSION_POR_MIME,
+    eliminar_blob_silencioso,
+)
 from pokegrading.compartido.errores import ErrorValidacion
 from pokegrading.compartido.logging import obtener_logger
-from pokegrading.compartido.almacenamiento.base import eliminar_blob_silencioso
-from pokegrading.negocio.evaluaciones.modelos import Evaluacion
-from pokegrading.negocio.evaluaciones.reglas import UMBRAL_IQS_DEFAULT, calcular_iq_score
-from pokegrading.negocio.evaluaciones.repositorio import EvaluacionRepositorio
 from pokegrading.compartido.schemas.evaluaciones import EnviarCartaResponse
+from pokegrading.negocio.evaluaciones.modelos import Evaluacion
+from pokegrading.negocio.evaluaciones.reglas import (
+    UMBRAL_IQS_DEFAULT,
+    calcular_iq_score,
+)
+from pokegrading.negocio.evaluaciones.repositorio import EvaluacionRepositorio
 
 logger = obtener_logger(__name__)
 

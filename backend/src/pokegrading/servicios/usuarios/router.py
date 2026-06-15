@@ -14,7 +14,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.datos.db import obtener_sesion
 from pokegrading.compartido.schemas.usuarios import (
     LoginRequest,
     LoginResponse,
@@ -23,6 +22,7 @@ from pokegrading.compartido.schemas.usuarios import (
     RegistroRequest,
     RegistroResponse,
 )
+from pokegrading.datos.db import obtener_sesion
 from pokegrading.negocio.usuarios.servicio import (
     LoginService,
     RefreshService,

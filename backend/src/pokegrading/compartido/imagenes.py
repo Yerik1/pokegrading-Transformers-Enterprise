@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from io import BytesIO
+
 from PIL import Image, UnidentifiedImageError
+
 from pokegrading.compartido.errores import ErrorValidacion
 
 TAMANO_MAXIMO_BYTES: int = 10 * 1024 * 1024

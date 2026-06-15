@@ -16,16 +16,18 @@ import uuid
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pokegrading.negocio.catalogo.modelos import Carta
-from pokegrading.negocio.catalogo.repositorio import CartaRepositorio
-from pokegrading.compartido.schemas.catalogo import CartaResponse, CrearCartaRequest
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
-from pokegrading.compartido.almacenamiento.base import EXTENSION_POR_MIME
+from pokegrading.compartido.almacenamiento.base import (
+    EXTENSION_POR_MIME,
+    eliminar_blob_silencioso,
+)
 from pokegrading.compartido.config import obtener_settings
 from pokegrading.compartido.errores import ErrorConflicto
-from pokegrading.compartido.logging import obtener_logger
-from pokegrading.compartido.almacenamiento.base import eliminar_blob_silencioso
 from pokegrading.compartido.imagenes import validar_imagen
+from pokegrading.compartido.logging import obtener_logger
+from pokegrading.compartido.schemas.catalogo import CartaResponse, CrearCartaRequest
+from pokegrading.negocio.catalogo.modelos import Carta
+from pokegrading.negocio.catalogo.repositorio import CartaRepositorio
 from pokegrading.negocio.identificacion.algoritmo import calcular_phash
 
 logger = obtener_logger(__name__)

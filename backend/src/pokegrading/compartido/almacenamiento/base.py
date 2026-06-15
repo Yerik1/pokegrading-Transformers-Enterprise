@@ -6,7 +6,7 @@ Las claves se organizan jerárquicamente con `/` como separador
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pokegrading.compartido.config import obtener_settings
 
