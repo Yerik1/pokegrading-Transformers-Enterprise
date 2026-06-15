@@ -19,13 +19,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from pokegrading.compartido.schemas.schemas import (
-    AtributosCartaB2B,
-    CartaConsultaItem,
-    LookupRequest,
-    LookupResponse,
-    ResultadoCartaB2B,
-)
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +27,13 @@ from pokegrading.compartido.errores import (
     ErrorAutorizacion,
 )
 from pokegrading.compartido.logging import obtener_logger
+from pokegrading.compartido.schemas.b2b import (
+    AtributosCartaB2B,
+    CartaConsultaItem,
+    LookupRequest,
+    LookupResponse,
+    ResultadoCartaB2B,
+)
 from pokegrading.negocio.b2b.repositorio import B2BRepositorio
 from pokegrading.negocio.b2b.seguridad import hashear_api_key
 from pokegrading.negocio.catalogo.modelos import Carta

@@ -22,9 +22,9 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request, status
-from pokegrading.compartido.schemas.schemas import LookupRequest, LookupResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pokegrading.compartido.schemas.b2b import LookupRequest, LookupResponse
 from pokegrading.datos.db import obtener_sesion
 from pokegrading.negocio.b2b.servicio import LookupB2BService
 
