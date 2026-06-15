@@ -25,8 +25,8 @@ from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.datos.db import obtener_sesion
-from pokegrading.negocio.b2b.b2b_schemas import LookupRequest, LookupResponse
-from pokegrading.negocio.b2b.b2b_servicio import LookupB2BService
+from pokegrading.negocio.b2b.schemas import LookupRequest, LookupResponse
+from pokegrading.negocio.b2b.servicio import LookupB2BService
 from pokegrading.compartido.errores import ErrorAutenticacion, ErrorAutorizacion
 
 router = APIRouter(prefix="/api/b2b/v1", tags=["b2b"])

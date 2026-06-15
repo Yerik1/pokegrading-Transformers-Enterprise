@@ -32,7 +32,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
  
-from pokegrading.compartido.db import Base
+from pokegrading.datos.db import Base
  
  
 class B2BCuenta(Base):

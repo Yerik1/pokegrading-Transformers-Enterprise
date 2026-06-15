@@ -28,9 +28,9 @@ from pokegrading.compartido.errores import (
     ErrorValidacion,
 )
 from pokegrading.compartido.logging import obtener_logger
-from pokegrading.negocio.b2b.b2b_repositorio import B2BRepositorio
-from pokegrading.negocio.b2b.b2b_seguridad import hashear_api_key
-from pokegrading.negocio.b2b.b2b_schemas import (
+from pokegrading.negocio.b2b.repositorio import B2BRepositorio
+from pokegrading.negocio.b2b.seguridad import hashear_api_key
+from pokegrading.negocio.b2b.schemas import (
     AtributosCartaB2B,
     CartaConsultaItem,
     LookupRequest,
