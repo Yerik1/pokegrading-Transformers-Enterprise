@@ -17,19 +17,17 @@ ni datos de otras tiendas.
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido.errores import (
     ErrorAutenticacion,
     ErrorAutorizacion,
-    ErrorValidacion,
 )
 from pokegrading.compartido.logging import obtener_logger
 from pokegrading.negocio.b2b.repositorio import B2BRepositorio
-from pokegrading.negocio.b2b.seguridad import hashear_api_key
 from pokegrading.negocio.b2b.schemas import (
     AtributosCartaB2B,
     CartaConsultaItem,
@@ -37,9 +35,9 @@ from pokegrading.negocio.b2b.schemas import (
     LookupResponse,
     ResultadoCartaB2B,
 )
+from pokegrading.negocio.b2b.seguridad import hashear_api_key
 from pokegrading.negocio.catalogo.modelos import Carta
 from pokegrading.negocio.catalogo.tipos import Acabado, Edicion, IdiomaCarta
-from sqlalchemy import and_, select
 
 logger = obtener_logger(__name__)
 

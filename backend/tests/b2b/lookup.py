@@ -13,7 +13,6 @@ Cubre los escenarios del US:
 from __future__ import annotations
 
 import hashlib
-import json
 import uuid
 from datetime import UTC, datetime
 
@@ -21,13 +20,12 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pokegrading.compartido.seguridad import hashear_password
 from pokegrading.negocio.b2b.modelos import B2BCuenta, B2BRateLimit
 from pokegrading.negocio.catalogo.modelos import Carta
 from pokegrading.negocio.catalogo.tipos import Acabado, Edicion, IdiomaCarta
 from pokegrading.negocio.usuarios.modelos import Usuario
 from pokegrading.negocio.usuarios.tipos import Idioma, Pais, Rol
-from pokegrading.compartido.seguridad import hashear_password
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -1,41 +1,45 @@
 """Repositorio módulo B2B.
- 
+
 Aísla SQLAlchemy del servicio. El servicio trabaja con métodos semánticos
 y nunca escribe SQL directamente.
 """
- 
+
 from __future__ import annotations
- 
+
 import uuid
 from datetime import UTC, datetime, timedelta
- 
-from sqlalchemy import and_, select, update
+
+from sqlalchemy import and_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
- 
-from pokegrading.negocio.b2b.modelos import B2BCuenta, B2BConsultaAuditoria, B2BRateLimit
- 
- 
+
+from pokegrading.negocio.b2b.modelos import (
+    B2BConsultaAuditoria,
+    B2BCuenta,
+    B2BRateLimit,
+)
+
+
 class B2BRepositorio:
     """Acceso a datos de las tres tablas B2B."""
- 
+
     def __init__(self, sesion: AsyncSession) -> None:
         self._sesion = sesion
- 
+
     # ------------------------------------------------------------------
     # Autenticación por API key
     # ------------------------------------------------------------------
- 
+
     async def obtener_cuenta_por_hash(self, api_key_hash: str) -> B2BCuenta | None:
         """Busca una cuenta por el hash SHA-256 de su API key."""
         stmt = select(B2BCuenta).where(B2BCuenta.api_key_hash == api_key_hash)
         resultado = await self._sesion.execute(stmt)
         return resultado.scalar_one_or_none()
- 
+
     # ------------------------------------------------------------------
     # Idempotencia
     # ------------------------------------------------------------------
- 
+
     async def obtener_consulta_por_idempotency_key(
         self,
         cuenta_id: uuid.UUID,
@@ -43,7 +47,7 @@ class B2BRepositorio:
         ventana_segundos: int,
     ) -> B2BConsultaAuditoria | None:
         """Busca un registro de auditoría previo dentro de la ventana de idempotencia.
- 
+
         Solo considera registros creados dentro de los últimos `ventana_segundos`.
         """
         desde = datetime.now(UTC) - timedelta(seconds=ventana_segundos)
@@ -56,11 +60,11 @@ class B2BRepositorio:
         )
         resultado = await self._sesion.execute(stmt)
         return resultado.scalar_one_or_none()
- 
+
     # ------------------------------------------------------------------
     # Rate limiting
     # ------------------------------------------------------------------
- 
+
     async def obtener_cartas_consultadas_mes(
         self, cuenta_id: uuid.UUID, anio: int, mes: int
     ) -> int:
@@ -75,7 +79,7 @@ class B2BRepositorio:
         resultado = await self._sesion.execute(stmt)
         valor = resultado.scalar_one_or_none()
         return valor if valor is not None else 0
- 
+
     async def incrementar_cartas_consultadas(
         self,
         cuenta_id: uuid.UUID,
@@ -84,7 +88,7 @@ class B2BRepositorio:
         cantidad: int,
     ) -> None:
         """Incrementa el contador de cartas del mes. Crea el registro si no existe (upsert).
- 
+
         Usa INSERT ... ON CONFLICT DO UPDATE para ser atómico y evitar race conditions.
         """
         nuevo_id = uuid.uuid4()
@@ -102,11 +106,11 @@ class B2BRepositorio:
             },
         )
         await self._sesion.execute(stmt)
- 
+
     # ------------------------------------------------------------------
     # Auditoría
     # ------------------------------------------------------------------
- 
+
     async def registrar_consulta(
         self,
         *,
