@@ -18,7 +18,7 @@ from pokegrading.compartido.almacenamiento import (
     AlmacenamientoEnMemoria,
     obtener_almacenamiento,
 )
-from pokegrading.compartido.db import Base, obtener_sesion
+from pokegrading.datos.db import Base, obtener_sesion
 from pokegrading.main import app
 
 

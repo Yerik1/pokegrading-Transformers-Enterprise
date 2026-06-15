@@ -24,12 +24,12 @@ from datetime import UTC, datetime
 from getpass import getpass
 
 from pokegrading.compartido.config import obtener_settings
-from pokegrading.compartido.db import abrir_sesion
+from pokegrading.datos.db import abrir_sesion
 from pokegrading.compartido.seguridad import hashear_password
-from pokegrading.usuarios import reglas
-from pokegrading.usuarios.modelos import Usuario
-from pokegrading.usuarios.repositorio import UsuarioRepositorio
-from pokegrading.usuarios.tipos import Idioma, Pais, Rol
+from pokegrading.negocio.usuarios import reglas
+from pokegrading.negocio.usuarios.modelos import Usuario
+from pokegrading.negocio.usuarios.repositorio import UsuarioRepositorio
+from pokegrading.negocio.catalogo.tipos import Idioma, Pais, Rol
 
 ROLES_PERMITIDOS = {Rol.ADMIN.value, Rol.SUPERADMIN.value}
 

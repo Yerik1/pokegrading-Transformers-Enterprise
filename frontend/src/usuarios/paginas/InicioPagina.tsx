@@ -79,14 +79,40 @@ function PanelAdmin() {
 
 function PanelSubmitter() {
   return (
-    <section className="rounded-card border border-ink/10 bg-cream p-8 text-center">
-      <h2 className="font-display text-3xl tracking-tight-display text-ink">
-        Tu cuenta está lista.
+    <section>
+      <h2 className="mb-6 font-display text-2xl tracking-tight-display text-ink">
+        Tus evaluaciones
       </h2>
-      <p className="mx-auto mt-3 max-w-md text-ink-muted">
-        La funcionalidad para subir y evaluar tus cartas se habilita en
-        próximos sprints. Te avisaremos en cuanto esté disponible.
-      </p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Link
+          to="/evaluaciones/enviar"
+          className="group rounded-card border border-ink/10 bg-cream p-6 transition-all hover:border-holo hover:shadow-sm"
+        >
+          <p className="mb-1 text-xs uppercase tracking-wider text-ink-subtle">
+            Evaluación
+          </p>
+          <h3 className="font-display text-xl text-ink group-hover:text-holo">
+            Enviar carta →
+          </h3>
+          <p className="mt-2 text-sm text-ink-muted">
+            Subí las fotos de tu carta. El sistema la identifica
+            automáticamente y registra tu solicitud de evaluación.
+          </p>
+        </Link>
+
+        <div className="rounded-card border border-dashed border-ink/15 bg-cream-dark/30 p-6">
+          <p className="mb-1 text-xs uppercase tracking-wider text-ink-subtle">
+            Próximamente
+          </p>
+          <h3 className="font-display text-xl text-ink-muted">
+            Mis evaluaciones
+          </h3>
+          <p className="mt-2 text-sm text-ink-subtle">
+            Historial de evaluaciones, resultados y recomendaciones
+            llegan en próximos sprints.
+          </p>
+        </div>
+      </div>
     </section>
   );
 }
