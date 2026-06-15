@@ -1,14 +1,4 @@
-"""Tests de integración del API B2B.
-
-Cubre los escenarios del US:
-- Autenticación válida → lookup exitoso (cubierta, múltiple, no cubierta)
-- Parámetros inválidos en una carta → esa carta marcada, las demás procesan
-- API key inválida → 401
-- Cuenta suspendida → 401
-- Idempotencia: mismo identificador_solicitud dentro de ventana → misma respuesta
-- Rate limit excedido → 429 con reintentar_en
-- Formato de error único en todos los rechazos
-"""
+"""Tests de integración del API B2B."""
 
 from __future__ import annotations
 
@@ -35,11 +25,11 @@ _API_KEY_VALIDA = "pg_b2b_testkey00000000000000000000000000000000000000000000000
 _API_KEY_HASH = hashlib.sha256(_API_KEY_VALIDA.encode()).hexdigest()
 
 
-def _usuario_b2b(sesion: AsyncSession) -> Usuario:
+def _usuario_b2b(_sesion: AsyncSession) -> Usuario:
     u = Usuario(
         correo="tienda@b2b.com",
         alias="TiendaTest",
-        hash_password=hashear_password("irrelevante"),
+        hash_password=hashear_password("Temporal1"),
         pais=Pais.CR,
         idioma_preferido=Idioma.ES,
         rol=Rol.B2B_SERVICE_ACCOUNT,
@@ -47,12 +37,12 @@ def _usuario_b2b(sesion: AsyncSession) -> Usuario:
         disclosure_version="v1.0",
         disclosure_aceptado_en=datetime.now(UTC),
     )
-    sesion.add(u)
+    _sesion.add(u)
     return u
 
 
-def _cuenta_b2b(usuario_id: uuid.UUID, sesion: AsyncSession, **kwargs) -> B2BCuenta:
-    cuenta = B2BCuenta(
+def _cuenta_b2b(usuario_id: uuid.UUID, _sesion: AsyncSession, **kwargs) -> B2BCuenta:
+    defaults = dict(
         nombre_tienda="Tienda Test",
         api_key_hash=_API_KEY_HASH,
         api_key_prefijo=_API_KEY_VALIDA[7:15],
@@ -61,13 +51,16 @@ def _cuenta_b2b(usuario_id: uuid.UUID, sesion: AsyncSession, **kwargs) -> B2BCue
         limite_cartas_mes=100,
         ventana_idempotencia_segundos=300,
         usuario_id=usuario_id,
-        **kwargs,
     )
-    sesion.add(cuenta)
+    defaults.update(kwargs)
+    cuenta = B2BCuenta(**defaults)
+    _sesion.add(cuenta)
     return cuenta
 
 
-def _carta(sesion: AsyncSession, set_codigo: str = "BASE1", numero: str = "4") -> Carta:
+def _carta(
+    _sesion: AsyncSession, set_codigo: str = "BASE1", numero: str = "4"
+) -> Carta:
     carta = Carta(
         set_codigo=set_codigo,
         numero=numero,
@@ -77,9 +70,9 @@ def _carta(sesion: AsyncSession, set_codigo: str = "BASE1", numero: str = "4") -
         nombre="Charizard",
         url_imagen_frente="https://blob.test/frente.jpg",
         clave_blob_frente="cartas/test/frente.jpg",
-        creada_por_id=uuid.uuid4(),  # se sobreescribirá en fixture si es necesario
+        creada_por_id=uuid.uuid4(),
     )
-    sesion.add(carta)
+    _sesion.add(carta)
     return carta
 
 
@@ -89,20 +82,20 @@ def _carta(sesion: AsyncSession, set_codigo: str = "BASE1", numero: str = "4") -
 
 
 @pytest.fixture
-async def cuenta_activa(sesion: AsyncSession):
+async def cuenta_activa(_sesion: AsyncSession) -> B2BCuenta:
     """Crea un usuario B2B y su cuenta activa en BD."""
-    usuario = _usuario_b2b(sesion)
-    await sesion.flush()
-    cuenta = _cuenta_b2b(usuario.id, sesion)
-    await sesion.flush()
+    usuario = _usuario_b2b(_sesion)
+    await _sesion.flush()
+    cuenta = _cuenta_b2b(usuario.id, _sesion)
+    await _sesion.flush()
     return cuenta
 
 
 @pytest.fixture
-async def carta_en_catalogo(sesion: AsyncSession):
-    """Inserta una carta en el catálogo."""
-    carta = _carta(sesion)
-    await sesion.flush()
+async def carta_en_catalogo(_sesion: AsyncSession) -> Carta:
+    """Inserta una carta BASE1/4 en el catálogo."""
+    carta = _carta(_sesion)
+    await _sesion.flush()
     return carta
 
 
@@ -130,17 +123,17 @@ async def test_api_key_invalida_devuelve_401(
 @pytest.mark.asyncio
 async def test_cuenta_suspendida_devuelve_401(
     cliente: AsyncClient,
-    sesion: AsyncSession,
+    _sesion: AsyncSession,
 ):
-    usuario = _usuario_b2b(sesion)
-    await sesion.flush()
+    usuario = _usuario_b2b(_sesion)
+    await _sesion.flush()
     _cuenta_b2b(
         usuario.id,
-        sesion,
+        _sesion,
         suspendida=True,
         motivo_suspension="Fraude detectado",
     )
-    await sesion.commit()
+    await _sesion.commit()
 
     res = await cliente.post(
         "/api/b2b/v1/catalogo/lookup",
@@ -169,8 +162,7 @@ async def test_carta_cubierta(
         headers={"X-Api-Key": _API_KEY_VALIDA},
     )
     assert res.status_code == 200
-    body = res.json()
-    resultado = body["resultados"][0]
+    resultado = res.json()["resultados"][0]
     assert resultado["estado"] == "cubierta"
     assert resultado["carta"]["set_codigo"] == "BASE1"
     assert resultado["carta"]["numero"] == "4"
@@ -196,11 +188,8 @@ async def test_parametros_invalidos_no_bloquea_otras_cartas(
     cliente: AsyncClient,
     cuenta_activa: B2BCuenta,
     carta_en_catalogo: Carta,
-    sesion: AsyncSession,
+    _sesion: AsyncSession,
 ):
-    """Una carta con acabado inválido → parametros_invalidos.
-    La segunda carta (válida) sí se resuelve.
-    """
     res = await cliente.post(
         "/api/b2b/v1/catalogo/lookup",
         json={
@@ -222,10 +211,8 @@ async def test_parametros_invalidos_no_bloquea_otras_cartas(
 async def test_multiples_coincidencias(
     cliente: AsyncClient,
     cuenta_activa: B2BCuenta,
-    sesion: AsyncSession,
+    _sesion: AsyncSession,
 ):
-    """Sin filtrar por edicion/idioma/acabado, pueden existir múltiples coincidencias."""
-    # Insertar dos cartas con mismo set/numero pero distinto acabado
     c1 = Carta(
         set_codigo="SWSH01",
         numero="1",
@@ -246,8 +233,8 @@ async def test_multiples_coincidencias(
         clave_blob_frente="t/2.jpg",
         creada_por_id=uuid.uuid4(),
     )
-    sesion.add_all([c1, c2])
-    await sesion.commit()
+    _sesion.add_all([c1, c2])
+    await _sesion.commit()
 
     res = await cliente.post(
         "/api/b2b/v1/catalogo/lookup",
@@ -258,7 +245,6 @@ async def test_multiples_coincidencias(
     resultado = res.json()["resultados"][0]
     assert resultado["estado"] == "coincidencia_multiple"
     assert len(resultado["candidatos"]) == 2
-    # Orden estable: por carta_id
     ids = [c["carta_id"] for c in resultado["candidatos"]]
     assert ids == sorted(ids)
 
@@ -289,9 +275,7 @@ async def test_reintento_idempotente_devuelve_misma_respuesta(
 
     assert res1.status_code == 200
     assert res2.status_code == 200
-    # El reintento debe indicarlo explícitamente
     assert res2.json()["es_reintento"] is True
-    # La respuesta de datos es la misma
     assert res1.json()["resultados"] == res2.json()["resultados"]
 
 
@@ -301,12 +285,11 @@ async def test_reintento_idempotente_devuelve_misma_respuesta(
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_excedido_devuelve_429(
+async def test_rate_limit_excedido_devuelve_403(
     cliente: AsyncClient,
     cuenta_activa: B2BCuenta,
-    sesion: AsyncSession,
+    _sesion: AsyncSession,
 ):
-    """Precarga el contador al límite y verifica que la siguiente consulta es rechazada."""
     ahora = datetime.now(UTC)
     rl = B2BRateLimit(
         cuenta_id=cuenta_activa.id,
@@ -314,15 +297,15 @@ async def test_rate_limit_excedido_devuelve_429(
         mes=ahora.month,
         cartas_consultadas=100,  # == limite_cartas_mes de la fixture
     )
-    sesion.add(rl)
-    await sesion.commit()
+    _sesion.add(rl)
+    await _sesion.commit()
 
     res = await cliente.post(
         "/api/b2b/v1/catalogo/lookup",
         json={"cartas": [{"set_codigo": "BASE1", "numero": "4"}]},
         headers={"X-Api-Key": _API_KEY_VALIDA},
     )
-    assert res.status_code == 403  # ErrorAutorizacion → 403
+    assert res.status_code == 403
     body = res.json()
     assert body["error"] == "cuota_mensual_excedida"
-    assert "reintentar_en" in body.get("contexto", body)
+    assert "reintentar_en" in body

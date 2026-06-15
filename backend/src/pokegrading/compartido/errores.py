@@ -103,6 +103,8 @@ def _payload_error(exc: ErrorDominio, correlation_id: str | None) -> dict[str, A
         payload["campo"] = exc.campo
     if correlation_id is not None:
         payload["correlation_id"] = correlation_id
+    if exc.codigo == "cuota_mensual_excedida" and "reintentar_en" in exc.contexto:
+        payload["reintentar_en"] = exc.contexto["reintentar_en"]
     return payload
 
 
