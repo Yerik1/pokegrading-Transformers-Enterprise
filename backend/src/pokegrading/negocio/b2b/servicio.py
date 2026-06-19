@@ -13,6 +13,12 @@ Orquesta en este orden:
 
 La consulta es de solo lectura sobre el catálogo y NUNCA expone evaluaciones
 ni datos de otras tiendas.
+
+Cada paso de `ejecutar()` está extraído a su propio método privado
+(`_autenticar`, `_verificar_idempotencia`, `_verificar_rate_limit`,
+`_persistir_resultado`) para que el método orquestador se lea como una
+lista de pasos de alto nivel y cada paso sea testeable y modificable
+de forma aislada.
 """
 
 from __future__ import annotations
@@ -34,6 +40,8 @@ from pokegrading.compartido.schemas.b2b import (
     LookupResponse,
     ResultadoCartaB2B,
 )
+from pokegrading.datos.db import unidad_de_trabajo
+from pokegrading.negocio.b2b.modelos import B2BCuenta
 from pokegrading.negocio.b2b.repositorio import B2BRepositorio
 from pokegrading.negocio.b2b.seguridad import hashear_api_key
 from pokegrading.negocio.catalogo.modelos import Carta
@@ -51,6 +59,10 @@ class LookupB2BService:
     def __init__(self, sesion: AsyncSession) -> None:
         self._sesion = sesion
         self._repo = B2BRepositorio(sesion)
+
+    # ------------------------------------------------------------------
+    # Orquestador — un paso por línea, sin lógica de negocio inline
+    # ------------------------------------------------------------------
 
     async def ejecutar(
         self,
@@ -73,8 +85,39 @@ class LookupB2BService:
             ErrorValidacion: consulta vacía o malformada.
             ErrorAutorizacion: cuota mensual excedida (429 semántico).
         """
+        cuenta = await self._autenticar(api_key, correlation_id)
 
-        # === 1. Autenticar API key ===
+        respuesta_cacheada = await self._verificar_idempotencia(
+            cuenta, payload, correlation_id
+        )
+        if respuesta_cacheada is not None:
+            return respuesta_cacheada
+
+        ahora = datetime.now(UTC)
+        cartas_solicitadas = len(payload.cartas)
+        await self._verificar_rate_limit(cuenta, cartas_solicitadas, ahora, correlation_id)
+
+        resultados = await self._resolver_cartas(payload.cartas)
+        respuesta = self._construir_respuesta(resultados, ahora, correlation_id)
+
+        await self._persistir_resultado(
+            cuenta, payload, cartas_solicitadas, ahora, correlation_id, respuesta
+        )
+
+        return respuesta
+
+    # ------------------------------------------------------------------
+    # Paso 1-2: autenticación + estado de cuenta
+    # ------------------------------------------------------------------
+
+    async def _autenticar(
+        self, api_key: str, correlation_id: str | None
+    ) -> B2BCuenta:
+        """Valida la API key y el estado de la cuenta (activa, no suspendida).
+
+        Raises:
+            ErrorAutenticacion: API key inválida o cuenta suspendida.
+        """
         api_key_hash = hashear_api_key(api_key)
         cuenta = await self._repo.obtener_cuenta_por_hash(api_key_hash)
 
@@ -103,107 +146,157 @@ class LookupB2BService:
                 ),
             )
 
-        # === 2. Idempotencia ===
-        if payload.identificador_solicitud:
-            registro_previo = await self._repo.obtener_consulta_por_idempotency_key(
-                cuenta_id=cuenta.id,
-                idempotency_key=payload.identificador_solicitud,
-                ventana_segundos=cuenta.ventana_idempotencia_segundos,
-            )
-            if registro_previo is not None:
-                logger.info(
-                    "b2b_reintento_idempotente",
-                    cuenta_id=str(cuenta.id),
-                    idempotency_key=payload.identificador_solicitud,
-                    correlation_id=correlation_id,
-                )
-                respuesta = LookupResponse.model_validate_json(
-                    registro_previo.respuesta_json
-                )
-                respuesta.es_reintento = True
-                respuesta.correlation_id = correlation_id
-                return respuesta
+        return cuenta
 
-        # === 3. Rate limiting ===
-        ahora = datetime.now(UTC)
-        cartas_solicitadas = len(payload.cartas)
+    # ------------------------------------------------------------------
+    # Paso 3: idempotencia
+    # ------------------------------------------------------------------
+
+    async def _verificar_idempotencia(
+        self,
+        cuenta: B2BCuenta,
+        payload: LookupRequest,
+        correlation_id: str | None,
+    ) -> LookupResponse | None:
+        """Si la consulta es un reintento dentro de la ventana, devuelve
+        la respuesta original guardada. Si no, devuelve None y el flujo
+        continúa normalmente.
+        """
+        if not payload.identificador_solicitud:
+            return None
+
+        registro_previo = await self._repo.obtener_consulta_por_idempotency_key(
+            cuenta_id=cuenta.id,
+            idempotency_key=payload.identificador_solicitud,
+            ventana_segundos=cuenta.ventana_idempotencia_segundos,
+        )
+        if registro_previo is None:
+            return None
+
+        logger.info(
+            "b2b_reintento_idempotente",
+            cuenta_id=str(cuenta.id),
+            idempotency_key=payload.identificador_solicitud,
+            correlation_id=correlation_id,
+        )
+        respuesta = LookupResponse.model_validate_json(registro_previo.respuesta_json)
+        respuesta.es_reintento = True
+        respuesta.correlation_id = correlation_id
+        return respuesta
+
+    # ------------------------------------------------------------------
+    # Paso 4: rate limiting
+    # ------------------------------------------------------------------
+
+    async def _verificar_rate_limit(
+        self,
+        cuenta: B2BCuenta,
+        cartas_solicitadas: int,
+        ahora: datetime,
+        correlation_id: str | None,
+    ) -> None:
+        """Verifica que la cuenta no exceda su cuota mensual de cartas.
+
+        Raises:
+            ErrorAutorizacion: si la cuota mensual sería excedida.
+        """
         consumido = await self._repo.obtener_cartas_consultadas_mes(
             cuenta_id=cuenta.id,
             anio=ahora.year,
             mes=ahora.month,
         )
 
-        if consumido + cartas_solicitadas > cuenta.limite_cartas_mes:
-            # Calcular cuándo reintentar: inicio del próximo mes
-            if ahora.month == 12:
-                reintentar = ahora.replace(
-                    year=ahora.year + 1,
-                    month=1,
-                    day=1,
-                    hour=0,
-                    minute=0,
-                    second=0,
-                    microsecond=0,
-                )
-            else:
-                reintentar = ahora.replace(
-                    month=ahora.month + 1,
-                    day=1,
-                    hour=0,
-                    minute=0,
-                    second=0,
-                    microsecond=0,
-                )
+        if consumido + cartas_solicitadas <= cuenta.limite_cartas_mes:
+            return
 
-            logger.warning(
-                "b2b_rate_limit_excedido",
-                cuenta_id=str(cuenta.id),
-                consumido=consumido,
-                solicitado=cartas_solicitadas,
-                limite=cuenta.limite_cartas_mes,
-                correlation_id=correlation_id,
+        reintentar = self._inicio_proximo_mes(ahora)
+
+        logger.warning(
+            "b2b_rate_limit_excedido",
+            cuenta_id=str(cuenta.id),
+            consumido=consumido,
+            solicitado=cartas_solicitadas,
+            limite=cuenta.limite_cartas_mes,
+            correlation_id=correlation_id,
+        )
+        raise ErrorAutorizacion(
+            codigo=_CODIGO_RATE_LIMIT,
+            mensaje=(
+                f"Cuota mensual excedida. "
+                f"Consumidas: {consumido}, límite: {cuenta.limite_cartas_mes}. "
+                f"Reintentar a partir de: {reintentar.isoformat()}."
+            ),
+            contexto={"reintentar_en": reintentar.isoformat()},
+        )
+
+    @staticmethod
+    def _inicio_proximo_mes(ahora: datetime) -> datetime:
+        """Calcula el primer instante del mes calendario siguiente."""
+        if ahora.month == 12:
+            return ahora.replace(
+                year=ahora.year + 1, month=1, day=1,
+                hour=0, minute=0, second=0, microsecond=0,
             )
-            raise ErrorAutorizacion(
-                codigo=_CODIGO_RATE_LIMIT,
-                mensaje=(
-                    f"Cuota mensual excedida. "
-                    f"Consumidas: {consumido}, límite: {cuenta.limite_cartas_mes}. "
-                    f"Reintentar a partir de: {reintentar.isoformat()}."
-                ),
-                contexto={"reintentar_en": reintentar.isoformat()},
-            )
+        return ahora.replace(
+            month=ahora.month + 1, day=1,
+            hour=0, minute=0, second=0, microsecond=0,
+        )
 
-        # === 4. Lookup de cartas ===
-        resultados = await self._resolver_cartas(payload.cartas)
+    # ------------------------------------------------------------------
+    # Paso 5: construir la respuesta consolidada
+    # ------------------------------------------------------------------
 
-        # === 5. Construir respuesta ===
-        respuesta = LookupResponse(
+    @staticmethod
+    def _construir_respuesta(
+        resultados: list[ResultadoCartaB2B],
+        ahora: datetime,
+        correlation_id: str | None,
+    ) -> LookupResponse:
+        return LookupResponse(
             resultados=resultados,
             generado_en=ahora,
             es_reintento=False,
             correlation_id=correlation_id,
         )
+
+    # ------------------------------------------------------------------
+    # Paso 6-7: auditoría + rate limit como unidad de trabajo atómica
+    # ------------------------------------------------------------------
+
+    async def _persistir_resultado(
+        self,
+        cuenta: B2BCuenta,
+        payload: LookupRequest,
+        cartas_solicitadas: int,
+        ahora: datetime,
+        correlation_id: str | None,
+        respuesta: LookupResponse,
+    ) -> None:
+        """Registra la auditoría e incrementa el rate limit en una sola
+        transacción atómica.
+
+        Ambas escrituras deben confirmarse juntas: un registro de
+        auditoría sin su incremento de cuota correspondiente (o
+        viceversa) dejaría el conteo de cuota desincronizado del
+        historial real de consultas servidas.
+        """
         respuesta_json = respuesta.model_dump_json()
 
-        # === 6. Auditoría (append-only) ===
-        await self._repo.registrar_consulta(
-            cuenta_id=cuenta.id,
-            idempotency_key=payload.identificador_solicitud,
-            total_cartas=cartas_solicitadas,
-            correlation_id=correlation_id,
-            respuesta_json=respuesta_json,
-            es_reintento=False,
-        )
-
-        # === 7. Incrementar rate limit (solo consultas nuevas, no reintentos) ===
-        await self._repo.incrementar_cartas_consultadas(
-            cuenta_id=cuenta.id,
-            anio=ahora.year,
-            mes=ahora.month,
-            cantidad=cartas_solicitadas,
-        )
-
-        await self._sesion.commit()
+        async with unidad_de_trabajo(self._sesion):
+            await self._repo.registrar_consulta(
+                cuenta_id=cuenta.id,
+                idempotency_key=payload.identificador_solicitud,
+                total_cartas=cartas_solicitadas,
+                correlation_id=correlation_id,
+                respuesta_json=respuesta_json,
+                es_reintento=False,
+            )
+            await self._repo.incrementar_cartas_consultadas(
+                cuenta_id=cuenta.id,
+                anio=ahora.year,
+                mes=ahora.month,
+                cantidad=cartas_solicitadas,
+            )
 
         logger.info(
             "b2b_lookup_completado",
@@ -212,7 +305,9 @@ class LookupB2BService:
             correlation_id=correlation_id,
         )
 
-        return respuesta
+    # ------------------------------------------------------------------
+    # Resolución de cartas individuales (ya estaba modularizado)
+    # ------------------------------------------------------------------
 
     async def _resolver_cartas(
         self, cartas: list[CartaConsultaItem]
@@ -234,70 +329,82 @@ class LookupB2BService:
         self, idx: int, carta: CartaConsultaItem
     ) -> ResultadoCartaB2B:
         """Resuelve una carta individual. Nunca lanza excepción — devuelve estado."""
+        opcionales_o_error = self._validar_opcionales_canonicos(idx, carta)
+        if isinstance(opcionales_o_error, ResultadoCartaB2B):
+            return opcionales_o_error
+        edicion_valida, idioma_valido, acabado_valido = opcionales_o_error
 
-        # --- Validar opcionales contra enums canónicos ---
-        edicion_valida: Edicion | None = None
-        if carta.edicion is not None:
+        coincidencias = await self._buscar_en_catalogo(
+            carta, edicion_valida, idioma_valido, acabado_valido
+        )
+        return self._a_resultado_segun_coincidencias(idx, coincidencias)
+
+    @staticmethod
+    def _validar_opcionales_canonicos(
+        idx: int, carta: CartaConsultaItem
+    ) -> ResultadoCartaB2B | tuple[Edicion | None, IdiomaCarta | None, Acabado | None]:
+        """Valida edicion/idioma/acabado contra sus enums canónicos.
+
+        Returns:
+            Tupla (edicion, idioma, acabado) si todos los opcionales
+            presentes son válidos, o un ResultadoCartaB2B de error si
+            alguno no lo es.
+        """
+        campos_a_validar = (
+            ("edicion", carta.edicion, Edicion),
+            ("idioma", carta.idioma, IdiomaCarta),
+            ("acabado", carta.acabado, Acabado),
+        )
+
+        valores: dict[str, object] = {}
+        for nombre_campo, valor_crudo, enum_cls in campos_a_validar:
+            if valor_crudo is None:
+                valores[nombre_campo] = None
+                continue
             try:
-                edicion_valida = Edicion(carta.edicion)
+                valores[nombre_campo] = enum_cls(valor_crudo)
             except ValueError:
                 return ResultadoCartaB2B(
                     index=idx,
                     estado="parametros_invalidos",
                     motivo=(
-                        f"Valor de 'edicion' no reconocido: '{carta.edicion}'. "
-                        f"Valores válidos: {[e.value for e in Edicion]}."
+                        f"Valor de '{nombre_campo}' no reconocido: '{valor_crudo}'. "
+                        f"Valores válidos: {[e.value for e in enum_cls]}."
                     ),
-                    campo="edicion",
+                    campo=nombre_campo,
                 )
 
-        idioma_valido: IdiomaCarta | None = None
-        if carta.idioma is not None:
-            try:
-                idioma_valido = IdiomaCarta(carta.idioma)
-            except ValueError:
-                return ResultadoCartaB2B(
-                    index=idx,
-                    estado="parametros_invalidos",
-                    motivo=(
-                        f"Valor de 'idioma' no reconocido: '{carta.idioma}'. "
-                        f"Valores válidos: {[i.value for i in IdiomaCarta]}."
-                    ),
-                    campo="idioma",
-                )
+        return valores["edicion"], valores["idioma"], valores["acabado"]
 
-        acabado_valido: Acabado | None = None
-        if carta.acabado is not None:
-            try:
-                acabado_valido = Acabado(carta.acabado)
-            except ValueError:
-                return ResultadoCartaB2B(
-                    index=idx,
-                    estado="parametros_invalidos",
-                    motivo=(
-                        f"Valor de 'acabado' no reconocido: '{carta.acabado}'. "
-                        f"Valores válidos: {[a.value for a in Acabado]}."
-                    ),
-                    campo="acabado",
-                )
-
-        # --- Construir query con los filtros disponibles ---
+    async def _buscar_en_catalogo(
+        self,
+        carta: CartaConsultaItem,
+        edicion: Edicion | None,
+        idioma: IdiomaCarta | None,
+        acabado: Acabado | None,
+    ) -> list[Carta]:
+        """Busca coincidencias en el catálogo por identity tuple,
+        en orden estable por carta_id.
+        """
         condiciones = [
             Carta.set_codigo == carta.set_codigo,
             Carta.numero == carta.numero,
         ]
-        if edicion_valida is not None:
-            condiciones.append(Carta.edicion == edicion_valida)
-        if idioma_valido is not None:
-            condiciones.append(Carta.idioma == idioma_valido)
-        if acabado_valido is not None:
-            condiciones.append(Carta.acabado == acabado_valido)
+        if edicion is not None:
+            condiciones.append(Carta.edicion == edicion)
+        if idioma is not None:
+            condiciones.append(Carta.idioma == idioma)
+        if acabado is not None:
+            condiciones.append(Carta.acabado == acabado)
 
         stmt = select(Carta).where(and_(*condiciones)).order_by(Carta.id)
         resultado = await self._sesion.execute(stmt)
-        coincidencias = resultado.scalars().all()
+        return list(resultado.scalars().all())
 
-        # --- Determinar estado ---
+    def _a_resultado_segun_coincidencias(
+        self, idx: int, coincidencias: list[Carta]
+    ) -> ResultadoCartaB2B:
+        """Traduce la cantidad de coincidencias al estado correspondiente."""
         if len(coincidencias) == 0:
             return ResultadoCartaB2B(index=idx, estado="no_cubierta")
 

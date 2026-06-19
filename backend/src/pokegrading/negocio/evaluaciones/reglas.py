@@ -115,11 +115,14 @@ def _validar_resolucion(ancho: int, alto: int, campo: str) -> None:
         )
 
 
-def _validar_blur(img_gris: Image.Image, campo: str) -> float:
-    """Valida nitidez y retorna la varianza del Laplaciano para reutilizar."""
-    laplaciano = np.array(img_gris.filter(ImageFilter.FIND_EDGES), dtype=np.float32)
-    varianza = float(np.var(laplaciano))
-    if varianza < UMBRAL_BLUR:
+def _validar_blur(varianza_laplaciano: float, campo: str) -> None:
+    """Valida nitidez a partir de una varianza ya calculada.
+
+    Recibe el valor pre-calculado (en vez de recalcularlo a partir de
+    la imagen) para no repetir el filtro de bordes dos veces sobre la
+    misma imagen: el score y la validación comparten un único cálculo.
+    """
+    if varianza_laplaciano < UMBRAL_BLUR:
         raise ErrorValidacion(
             codigo="iq_imagen_borrosa",
             mensaje=(
@@ -128,13 +131,15 @@ def _validar_blur(img_gris: Image.Image, campo: str) -> float:
             ),
             campo=campo,
         )
-    return varianza
 
 
-def _validar_brillo(arr: np.ndarray, campo: str) -> float:
-    """Valida iluminación y retorna el brillo promedio para reutilizar."""
-    brillo = float(np.mean(arr))
-    if brillo < BRILLO_MINIMO:
+def _validar_brillo(brillo_promedio: float, campo: str) -> None:
+    """Valida iluminación a partir de un brillo ya calculado.
+
+    Recibe el valor pre-calculado por la misma razón que `_validar_blur`:
+    evitar recorrer el array de píxeles dos veces.
+    """
+    if brillo_promedio < BRILLO_MINIMO:
         raise ErrorValidacion(
             codigo="iq_iluminacion_insuficiente",
             mensaje=(
@@ -143,7 +148,7 @@ def _validar_brillo(arr: np.ndarray, campo: str) -> float:
             ),
             campo=campo,
         )
-    if brillo > BRILLO_MAXIMO:
+    if brillo_promedio > BRILLO_MAXIMO:
         raise ErrorValidacion(
             codigo="iq_sobreexposicion",
             mensaje=(
@@ -152,7 +157,6 @@ def _validar_brillo(arr: np.ndarray, campo: str) -> float:
             ),
             campo=campo,
         )
-    return brillo
 
 
 # ---------------------------------------------------------------------------
@@ -181,13 +185,27 @@ def calcular_iq_score(imagen_bytes: bytes, campo: str) -> float:
     img_gris = img.convert("L")
     arr = np.array(img_gris, dtype=np.float32)
 
-    _validar_blur(img_gris, campo)
-    _validar_brillo(arr, campo)
+    # Cada dimensión se calcula una sola vez en su forma cruda (sin
+    # normalizar a 0-1), y ese mismo valor crudo se usa tanto para
+    # validar el umbral mínimo como para derivar el score normalizado.
+    # Importante: la varianza/brillo se calculan ANTES de aplicar
+    # min()/normalización, para no perder precisión cuando el valor
+    # real supera el divisor de normalización.
+    laplaciano = np.array(img_gris.filter(ImageFilter.FIND_EDGES), dtype=np.float32)
+    varianza_laplaciano = float(np.var(laplaciano))
+    brillo_promedio = float(np.mean(arr))
+
+    _validar_blur(varianza_laplaciano, campo)
+    _validar_brillo(brillo_promedio, campo)
+
+    score_blur = min(varianza_laplaciano / DIVISOR_NORMALIZACION_BLUR, 1.0)
+    score_brillo = 1.0 - abs(brillo_promedio - BRILLO_NEUTRO) / BRILLO_NEUTRO
+    score_resolucion = calcular_score_resolucion(ancho, alto)
 
     score = round(
-        calcular_score_blur(img_gris) * PESO_BLUR
-        + calcular_score_brillo(arr) * PESO_BRILLO
-        + calcular_score_resolucion(ancho, alto) * PESO_RESOLUCION,
+        score_blur * PESO_BLUR
+        + score_brillo * PESO_BRILLO
+        + score_resolucion * PESO_RESOLUCION,
         4,
     )
 

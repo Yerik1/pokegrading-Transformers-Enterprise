@@ -73,15 +73,3 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-ra --strict-markers"
-
-[tool.coverage.run]
-omit = [
-    "src/pokegrading/catalogo/*",
-    "src/pokegrading/usuarios/*",
-    "src/pokegrading/identificacion/__init__.py",
-    "src/pokegrading/grading/*",
-    "src/pokegrading/compartido/db.py",
-    "src/pokegrading/compartido/dependencias.py",
-    "src/pokegrading/datos/db.py",
-    "src/pokegrading/compartido/almacenamiento/azure_blob.py",
-]
