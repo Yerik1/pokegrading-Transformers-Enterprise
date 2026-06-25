@@ -110,10 +110,6 @@ class B2BConsultaAuditoria(Base):
     """
 
     __tablename__ = "b2b_consultas_auditoria"
-    __table_args__ = (
-        # Unicidad de idempotency_key por cuenta (no global)
-        UniqueConstraint("cuenta_id", "idempotency_key", name="uq_b2b_idempotencia"),
-    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

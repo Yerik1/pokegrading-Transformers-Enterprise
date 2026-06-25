@@ -16,9 +16,21 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from datetime import datetime
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from pokegrading.compartido.errores import ErrorAutorizacion
+from pokegrading.compartido.logging import obtener_logger
+from pokegrading.negocio.b2b.modelos import B2BCuenta
+from pokegrading.negocio.b2b.repositorio import B2BRepositorio
+
+logger = obtener_logger(__name__)
 
 _PREFIJO_API_KEY = "pg_b2b_"
 _BYTES_SECRETO = 32  # 256 bits de entropía
+# Código de error estable para rate limit (US: "informando cuándo reintentar")
+_CODIGO_RATE_LIMIT = "cuota_mensual_excedida"
 
 
 def generar_api_key() -> str:
@@ -57,3 +69,69 @@ def extraer_prefijo(api_key: str) -> str:
     """
     secreto = api_key.removeprefix(_PREFIJO_API_KEY)
     return secreto[:8]
+
+
+async def verificar_rate_limit(
+    cuenta: B2BCuenta,
+    cartas_solicitadas: int,
+    ahora: datetime,
+    correlation_id: str | None,
+    sesion: AsyncSession,
+) -> None:
+    """Verifica que la cuenta no exceda su cuota mensual de cartas.
+
+    Raises:
+        ErrorAutorizacion: si la cuota mensual sería excedida.
+    """
+    _repo = B2BRepositorio(sesion)
+    consumido = await _repo.obtener_cartas_consultadas_mes(
+        cuenta_id=cuenta.id,
+        anio=ahora.year,
+        mes=ahora.month,
+    )
+
+    if consumido + cartas_solicitadas <= cuenta.limite_cartas_mes:
+        return
+
+    reintentar = _inicio_proximo_mes(ahora)
+
+    logger.warning(
+        "b2b_rate_limit_excedido",
+        cuenta_id=str(cuenta.id),
+        consumido=consumido,
+        solicitado=cartas_solicitadas,
+        limite=cuenta.limite_cartas_mes,
+        correlation_id=correlation_id,
+    )
+    raise ErrorAutorizacion(
+        codigo=_CODIGO_RATE_LIMIT,
+        mensaje=(
+            f"Cuota mensual excedida. "
+            f"Consumidas: {consumido}, límite: {cuenta.limite_cartas_mes}. "
+            f"Reintentar a partir de: {reintentar.isoformat()}."
+        ),
+        contexto={"reintentar_en": reintentar.isoformat()},
+    )
+
+
+@staticmethod
+def _inicio_proximo_mes(ahora: datetime) -> datetime:
+    """Calcula el primer instante del mes calendario siguiente."""
+    if ahora.month == 12:
+        return ahora.replace(
+            year=ahora.year + 1,
+            month=1,
+            day=1,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+    return ahora.replace(
+        month=ahora.month + 1,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )

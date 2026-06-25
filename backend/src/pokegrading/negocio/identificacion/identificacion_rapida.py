@@ -11,6 +11,8 @@ El score de confianza se deriva de la distancia Hamming normalizada:
 donde 64 es el número de bits del phash.
 """
 
+# RENOMBRAR A IDENTIFICACION RAPIDA
+
 from __future__ import annotations
 
 from dataclasses import dataclass

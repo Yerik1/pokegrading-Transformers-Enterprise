@@ -13,7 +13,7 @@ from pokegrading.compartido.schemas.identificacion import (
     CandidatoResponse,
 )
 from pokegrading.negocio.catalogo.modelos import Carta
-from pokegrading.negocio.identificacion.algoritmo import (
+from pokegrading.negocio.identificacion.identificacion_rapida import (
     UMBRAL_ACEPTACION_AUTO,
     buscar_candidatos,
     calcular_phash,

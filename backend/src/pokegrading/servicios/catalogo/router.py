@@ -55,36 +55,9 @@ async def agregar_carta_al_catalogo(
     ] = None,
 ) -> CartaResponse:
     """Endpoint POST que da de alta una carta. Cubre la US "Agregar carta al catálogo"."""
-    # 1) Parsear el JSON del campo `datos`
-    try:
-        datos_dict = json.loads(datos)
-    except json.JSONDecodeError as exc:
-        raise ErrorValidacion(
-            codigo="datos_json_invalido",
-            mensaje="El campo 'datos' no contiene un JSON válido.",
-            campo="datos",
-        ) from exc
+    request = _parsear_y_validar_datos(datos)
+    bytes_frente, bytes_reverso = await _leer_imagenes(imagen_frente, imagen_reverso)
 
-    # 2) Validar contra el schema Pydantic
-    try:
-        request = CrearCartaRequest.model_validate(datos_dict)
-    except ValidationError as exc:
-        primer_error = exc.errors()[0] if exc.errors() else {}
-        loc = primer_error.get("loc", [])
-        campo = str(loc[-1]) if loc else None
-        raise ErrorValidacion(
-            codigo="datos_invalidos",
-            mensaje=primer_error.get("msg", "Datos de la carta inválidos."),
-            campo=campo,
-        ) from exc
-
-    # 3) Leer los bytes de las imágenes
-    bytes_frente = await imagen_frente.read()
-    bytes_reverso: bytes | None = None
-    if imagen_reverso is not None:
-        bytes_reverso = await imagen_reverso.read()
-
-    # 4) Delegar al servicio de aplicación
     servicio = CrearCartaService(sesion, almacenamiento)
     return await servicio.ejecutar(
         request,
@@ -96,3 +69,41 @@ async def agregar_carta_al_catalogo(
         ),
         creada_por_id=usuario_actual.id,
     )
+
+
+def _parsear_y_validar_datos(datos: str) -> CrearCartaRequest:
+    """Parsea el campo `datos` (JSON embebido en multipart) y lo valida
+    contra el schema Pydantic.
+
+    Raises:
+        ErrorValidacion: si el JSON es inválido o no cumple el schema.
+    """
+    try:
+        datos_dict = json.loads(datos)
+    except json.JSONDecodeError as exc:
+        raise ErrorValidacion(
+            codigo="datos_json_invalido",
+            mensaje="El campo 'datos' no contiene un JSON válido.",
+            campo="datos",
+        ) from exc
+
+    try:
+        return CrearCartaRequest.model_validate(datos_dict)
+    except ValidationError as exc:
+        primer_error = exc.errors()[0] if exc.errors() else {}
+        loc = primer_error.get("loc", [])
+        campo = str(loc[-1]) if loc else None
+        raise ErrorValidacion(
+            codigo="datos_invalidos",
+            mensaje=primer_error.get("msg", "Datos de la carta inválidos."),
+            campo=campo,
+        ) from exc
+
+
+async def _leer_imagenes(
+    imagen_frente: UploadFile, imagen_reverso: UploadFile | None
+) -> tuple[bytes, bytes | None]:
+    """Lee los bytes de las imágenes recibidas en el multipart."""
+    bytes_frente = await imagen_frente.read()
+    bytes_reverso = await imagen_reverso.read() if imagen_reverso is not None else None
+    return bytes_frente, bytes_reverso
