@@ -15,7 +15,7 @@ La consulta es de solo lectura sobre el catálogo y NUNCA expone evaluaciones
 ni datos de otras tiendas.
 
 Cada paso de `ejecutar()` está extraído a su propio método privado
-(`_autenticar`, `_verificar_idempotencia`, `_verificar_rate_limit`,
+(`_autenticar`, `verificar_idempotencia`, `verificar_rate_limit`,
 `_persistir_resultado`) para que el método orquestador se lea como una
 lista de pasos de alto nivel y cada paso sea testeable y modificable
 de forma aislada.
@@ -30,8 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido.errores import (
     ErrorAutenticacion,
-    ErrorAutorizacion,
 )
+from pokegrading.compartido.idempotencia import verificar_idempotencia
 from pokegrading.compartido.logging import obtener_logger
 from pokegrading.compartido.schemas.b2b import (
     AtributosCartaB2B,
@@ -43,14 +43,11 @@ from pokegrading.compartido.schemas.b2b import (
 from pokegrading.datos.db import unidad_de_trabajo
 from pokegrading.negocio.b2b.modelos import B2BCuenta
 from pokegrading.negocio.b2b.repositorio import B2BRepositorio
-from pokegrading.negocio.b2b.seguridad import hashear_api_key
+from pokegrading.negocio.b2b.seguridad import hashear_api_key, verificar_rate_limit
 from pokegrading.negocio.catalogo.modelos import Carta
 from pokegrading.negocio.catalogo.tipos import Acabado, Edicion, IdiomaCarta
 
 logger = obtener_logger(__name__)
-
-# Código de error estable para rate limit (US: "informando cuándo reintentar")
-_CODIGO_RATE_LIMIT = "cuota_mensual_excedida"
 
 
 class LookupB2BService:
@@ -87,15 +84,17 @@ class LookupB2BService:
         """
         cuenta = await self._autenticar(api_key, correlation_id)
 
-        respuesta_cacheada = await self._verificar_idempotencia(
-            cuenta, payload, correlation_id
+        respuesta_cacheada = await verificar_idempotencia(
+            cuenta, payload, correlation_id, self._sesion
         )
         if respuesta_cacheada is not None:
             return respuesta_cacheada
 
         ahora = datetime.now(UTC)
         cartas_solicitadas = len(payload.cartas)
-        await self._verificar_rate_limit(cuenta, cartas_solicitadas, ahora, correlation_id)
+        await verificar_rate_limit(
+            cuenta, cartas_solicitadas, ahora, correlation_id, self._sesion
+        )
 
         resultados = await self._resolver_cartas(payload.cartas)
         respuesta = self._construir_respuesta(resultados, ahora, correlation_id)
@@ -110,9 +109,7 @@ class LookupB2BService:
     # Paso 1-2: autenticación + estado de cuenta
     # ------------------------------------------------------------------
 
-    async def _autenticar(
-        self, api_key: str, correlation_id: str | None
-    ) -> B2BCuenta:
+    async def _autenticar(self, api_key: str, correlation_id: str | None) -> B2BCuenta:
         """Valida la API key y el estado de la cuenta (activa, no suspendida).
 
         Raises:
@@ -149,98 +146,12 @@ class LookupB2BService:
         return cuenta
 
     # ------------------------------------------------------------------
-    # Paso 3: idempotencia
+    # Paso 3: idempotencia (verficar compartidos.idempotencia)
     # ------------------------------------------------------------------
 
-    async def _verificar_idempotencia(
-        self,
-        cuenta: B2BCuenta,
-        payload: LookupRequest,
-        correlation_id: str | None,
-    ) -> LookupResponse | None:
-        """Si la consulta es un reintento dentro de la ventana, devuelve
-        la respuesta original guardada. Si no, devuelve None y el flujo
-        continúa normalmente.
-        """
-        if not payload.identificador_solicitud:
-            return None
-
-        registro_previo = await self._repo.obtener_consulta_por_idempotency_key(
-            cuenta_id=cuenta.id,
-            idempotency_key=payload.identificador_solicitud,
-            ventana_segundos=cuenta.ventana_idempotencia_segundos,
-        )
-        if registro_previo is None:
-            return None
-
-        logger.info(
-            "b2b_reintento_idempotente",
-            cuenta_id=str(cuenta.id),
-            idempotency_key=payload.identificador_solicitud,
-            correlation_id=correlation_id,
-        )
-        respuesta = LookupResponse.model_validate_json(registro_previo.respuesta_json)
-        respuesta.es_reintento = True
-        respuesta.correlation_id = correlation_id
-        return respuesta
-
     # ------------------------------------------------------------------
-    # Paso 4: rate limiting
+    # Paso 4: rate limiting (verificar seguridad.verificar_rate_limit)
     # ------------------------------------------------------------------
-
-    async def _verificar_rate_limit(
-        self,
-        cuenta: B2BCuenta,
-        cartas_solicitadas: int,
-        ahora: datetime,
-        correlation_id: str | None,
-    ) -> None:
-        """Verifica que la cuenta no exceda su cuota mensual de cartas.
-
-        Raises:
-            ErrorAutorizacion: si la cuota mensual sería excedida.
-        """
-        consumido = await self._repo.obtener_cartas_consultadas_mes(
-            cuenta_id=cuenta.id,
-            anio=ahora.year,
-            mes=ahora.month,
-        )
-
-        if consumido + cartas_solicitadas <= cuenta.limite_cartas_mes:
-            return
-
-        reintentar = self._inicio_proximo_mes(ahora)
-
-        logger.warning(
-            "b2b_rate_limit_excedido",
-            cuenta_id=str(cuenta.id),
-            consumido=consumido,
-            solicitado=cartas_solicitadas,
-            limite=cuenta.limite_cartas_mes,
-            correlation_id=correlation_id,
-        )
-        raise ErrorAutorizacion(
-            codigo=_CODIGO_RATE_LIMIT,
-            mensaje=(
-                f"Cuota mensual excedida. "
-                f"Consumidas: {consumido}, límite: {cuenta.limite_cartas_mes}. "
-                f"Reintentar a partir de: {reintentar.isoformat()}."
-            ),
-            contexto={"reintentar_en": reintentar.isoformat()},
-        )
-
-    @staticmethod
-    def _inicio_proximo_mes(ahora: datetime) -> datetime:
-        """Calcula el primer instante del mes calendario siguiente."""
-        if ahora.month == 12:
-            return ahora.replace(
-                year=ahora.year + 1, month=1, day=1,
-                hour=0, minute=0, second=0, microsecond=0,
-            )
-        return ahora.replace(
-            month=ahora.month + 1, day=1,
-            hour=0, minute=0, second=0, microsecond=0,
-        )
 
     # ------------------------------------------------------------------
     # Paso 5: construir la respuesta consolidada

@@ -132,8 +132,11 @@ class EnviarCartaService:
 
         evaluacion_id = uuid.uuid4()
         subidas = await self._subir_imagenes(
-            evaluacion_id, imagen_frente, imagenes.mime_frente,
-            imagen_reverso, imagenes.mime_reverso,
+            evaluacion_id,
+            imagen_frente,
+            imagenes.mime_frente,
+            imagen_reverso,
+            imagenes.mime_reverso,
         )
 
         evaluacion = await self._persistir_evaluacion(
@@ -175,7 +178,9 @@ class EnviarCartaService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _calcular_calidad(imagen_frente: bytes, imagen_reverso: bytes) -> _CalidadImagen:
+    def _calcular_calidad(
+        imagen_frente: bytes, imagen_reverso: bytes
+    ) -> _CalidadImagen:
         """Calcula el IQ Score de ambas imágenes y rechaza si no alcanzan
         el umbral mínimo.
 
@@ -242,8 +247,12 @@ class EnviarCartaService:
         subió, el frente se elimina para no dejar un blob huérfano.
         """
         contenedor = CONTENEDOR_EVALUACIONES
-        clave_frente = f"evaluaciones/{evaluacion_id}/frente.{EXTENSION_POR_MIME[mime_frente]}"
-        clave_reverso = f"evaluaciones/{evaluacion_id}/reverso.{EXTENSION_POR_MIME[mime_reverso]}"
+        clave_frente = (
+            f"evaluaciones/{evaluacion_id}/frente.{EXTENSION_POR_MIME[mime_frente]}"
+        )
+        clave_reverso = (
+            f"evaluaciones/{evaluacion_id}/reverso.{EXTENSION_POR_MIME[mime_reverso]}"
+        )
 
         try:
             url_frente = await self._almacenamiento.guardar(

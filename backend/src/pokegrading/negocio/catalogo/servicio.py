@@ -33,7 +33,7 @@ from pokegrading.compartido.schemas.catalogo import CartaResponse, CrearCartaReq
 from pokegrading.datos.db import unidad_de_trabajo
 from pokegrading.negocio.catalogo.modelos import Carta
 from pokegrading.negocio.catalogo.repositorio import CartaRepositorio
-from pokegrading.negocio.identificacion.algoritmo import calcular_phash
+from pokegrading.negocio.identificacion.identificacion_rapida import calcular_phash
 
 logger = obtener_logger(__name__)
 
@@ -54,7 +54,13 @@ class _ImagenesPreparadas:
 class _ImagenesSubidas:
     """Resultado del paso 3: URLs y claves de blob de ambas imágenes."""
 
-    __slots__ = ("contenedor", "url_frente", "clave_frente", "url_reverso", "clave_reverso")
+    __slots__ = (
+        "contenedor",
+        "url_frente",
+        "clave_frente",
+        "url_reverso",
+        "clave_reverso",
+    )
 
     def __init__(
         self,
@@ -105,8 +111,11 @@ class CrearCartaService:
 
         carta_id = uuid.uuid4()
         subidas = await self._subir_imagenes(
-            carta_id, imagen_frente, imagenes.mime_frente,
-            imagen_reverso, imagenes.mime_reverso,
+            carta_id,
+            imagen_frente,
+            imagenes.mime_frente,
+            imagen_reverso,
+            imagenes.mime_reverso,
         )
 
         nueva = await self._persistir_carta(
@@ -224,7 +233,9 @@ class CrearCartaService:
         clave_reverso: str | None = None
         url_reverso: str | None = None
         if imagen_reverso is not None and mime_reverso is not None:
-            clave_reverso = f"cartas/{carta_id}/reverso.{EXTENSION_POR_MIME[mime_reverso]}"
+            clave_reverso = (
+                f"cartas/{carta_id}/reverso.{EXTENSION_POR_MIME[mime_reverso]}"
+            )
             try:
                 url_reverso = await self._almacenamiento.guardar(
                     contenedor, clave_reverso, imagen_reverso, mime_reverso
@@ -233,7 +244,9 @@ class CrearCartaService:
                 await eliminar_blob_silencioso(contenedor, clave_frente, logger)
                 raise
 
-        return _ImagenesSubidas(contenedor, url_frente, clave_frente, url_reverso, clave_reverso)
+        return _ImagenesSubidas(
+            contenedor, url_frente, clave_frente, url_reverso, clave_reverso
+        )
 
     # ------------------------------------------------------------------
     # Paso 4: persistir en BD como unidad de trabajo atómica
@@ -279,9 +292,13 @@ class CrearCartaService:
             async with unidad_de_trabajo(self._sesion):
                 await self._repo.guardar(nueva)
         except IntegrityError as exc:
-            await eliminar_blob_silencioso(subidas.contenedor, subidas.clave_frente, logger)
+            await eliminar_blob_silencioso(
+                subidas.contenedor, subidas.clave_frente, logger
+            )
             if subidas.clave_reverso is not None:
-                await eliminar_blob_silencioso(subidas.contenedor, subidas.clave_reverso, logger)
+                await eliminar_blob_silencioso(
+                    subidas.contenedor, subidas.clave_reverso, logger
+                )
             raise ErrorConflicto(
                 codigo="carta_duplicada",
                 mensaje="Ya existe una carta con la misma identidad.",
