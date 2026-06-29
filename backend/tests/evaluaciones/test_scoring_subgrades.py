@@ -31,6 +31,7 @@ from pokegrading.negocio.evaluaciones.tipos import RegionCarta
 # Fixtures de baseline
 # ---------------------------------------------------------------------------
 
+
 def _baseline_global() -> ReferenciaBaseline:
     return ReferenciaBaseline(
         id="global",
@@ -65,6 +66,7 @@ def _region(alto: int = 50, ancho: int = 50, valor: int = 128) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # calcular_subgrade
 # ---------------------------------------------------------------------------
+
 
 def test_calcular_subgrade_region_vacia_devuelve_none() -> None:
     region = np.array([], dtype=np.uint8).reshape(0, 0)
@@ -131,6 +133,7 @@ def test_calcular_subgrade_surface_con_ruido_es_menor() -> None:
 # seleccionar_baseline
 # ---------------------------------------------------------------------------
 
+
 def test_seleccionar_baseline_usa_especifico_si_muestra_suficiente() -> None:
     especifico = _baseline_especifico(muestra=MUESTRA_MINIMA_GROUND_TRUTH)
     global_ = _baseline_global()
@@ -154,6 +157,7 @@ def test_seleccionar_baseline_usa_global_si_especifico_es_none() -> None:
 # ---------------------------------------------------------------------------
 # calcular_grado_final
 # ---------------------------------------------------------------------------
+
 
 def test_calcular_grado_final_todos_none_devuelve_none() -> None:
     subgrades = {
@@ -210,6 +214,7 @@ def test_calcular_grado_final_ignora_none_en_subgrades() -> None:
 # calcular_banda_incertidumbre
 # ---------------------------------------------------------------------------
 
+
 def test_banda_con_baseline_global_es_mayor() -> None:
     global_ = _baseline_global()
     banda = calcular_banda_incertidumbre(global_)
@@ -232,6 +237,7 @@ def test_banda_global_mayor_que_especifica() -> None:
 # ---------------------------------------------------------------------------
 # calcular_calificacion (orquestador)
 # ---------------------------------------------------------------------------
+
 
 def _regiones_validas() -> dict[str, np.ndarray]:
     return {
@@ -287,7 +293,10 @@ def test_calcular_calificacion_regla_coherencia_verificada() -> None:
             resultado.subgrade_surface,
         ]
         minimo = min(s for s in subgrades if s is not None)
-        assert resultado.grado_estimado <= round(minimo + MARGEN_COHERENCIA_GRADO_FINAL, 2) + 0.01
+        assert (
+            resultado.grado_estimado
+            <= round(minimo + MARGEN_COHERENCIA_GRADO_FINAL, 2) + 0.01
+        )
 
 
 def test_calcular_calificacion_grado_en_escala_valida() -> None:

@@ -23,6 +23,7 @@ from pokegrading.negocio.evaluaciones.algoritmo.vision_preprocesamiento import (
 # Helpers para generar imágenes sintéticas
 # ---------------------------------------------------------------------------
 
+
 def _imagen_bytes(ancho: int = 800, alto: int = 1100, modo: str = "RGB") -> bytes:
     """Imagen JPG sintética del tamaño dado."""
     img = Image.new(modo, (ancho, alto), color=(200, 200, 200))
@@ -41,6 +42,7 @@ def _imagen_con_carta(
     """Imagen con un rectángulo oscuro sobre fondo claro — simula carta con contraste."""
     img = Image.new("RGB", (ancho, alto), color=color_fondo)
     from PIL import ImageDraw
+
     draw = ImageDraw.Draw(img)
     draw.rectangle(
         [margen, margen, ancho - margen, alto - margen],
@@ -56,6 +58,7 @@ def _imagen_con_carta(
 # ---------------------------------------------------------------------------
 # _segmentar_regiones
 # ---------------------------------------------------------------------------
+
 
 def test_segmentar_regiones_devuelve_4_regiones() -> None:
     regiones = _segmentar_regiones(800, 1100)
@@ -93,15 +96,13 @@ def test_segmentar_regiones_todas_tienen_area_positiva() -> None:
 # preprocesar_imagen
 # ---------------------------------------------------------------------------
 
+
 def test_preprocesar_imagen_fondo_uniforme_sin_carta_lanza_error() -> None:
     """Imagen sin carta detectable → ErrorSolicitudInvalida fondo_no_aislable."""
     imagen = _imagen_bytes(800, 1100)
     with pytest.raises(ErrorSolicitudInvalida) as exc:
         preprocesar_imagen(imagen, campo="imagen_frente")
     assert exc.value.codigo == "fondo_no_aislable"
-
-
-
 
 
 def test_preprocesar_imagen_con_carta_devuelve_imagen_preprocesada() -> None:

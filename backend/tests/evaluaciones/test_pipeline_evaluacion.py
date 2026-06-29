@@ -24,6 +24,7 @@ from pokegrading.negocio.usuarios.tipos import Idioma, Pais, Rol
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _imagen_con_carta_bytes() -> bytes:
     """Imagen sintética con carta sobre fondo blanco — pasa el pipeline."""
     img = Image.new("RGB", (800, 1100), color=(255, 255, 255))
@@ -88,6 +89,7 @@ def _token_de(usuario: Usuario) -> str:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_enviar_carta_sin_autenticacion_devuelve_401(
