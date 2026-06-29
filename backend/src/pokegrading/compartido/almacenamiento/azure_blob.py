@@ -11,6 +11,7 @@ from azure.core.exceptions import ResourceNotFoundError
 from azure.storage.blob import ContentSettings
 from azure.storage.blob.aio import BlobServiceClient
 
+from pokegrading.compartido.errores import ErrorNoEncontrado
 from pokegrading.compartido.logging import obtener_logger
 
 logger = obtener_logger(__name__)
@@ -56,6 +57,32 @@ class AlmacenamientoAzureBlob:
 
     async def obtener_url(self, contenedor: str, clave: str) -> str:
         return self._client.get_blob_client(container=contenedor, blob=clave).url
+
+    async def descargar(self, contenedor: str, clave: str) -> bytes:
+        """Descarga y devuelve los bytes del blob.
+
+        Raises:
+            ErrorNoEncontrado: si el blob no existe.
+        """
+        blob_client = self._client.get_blob_client(container=contenedor, blob=clave)
+        try:
+            descargador = await blob_client.download_blob()
+            contenido = await descargador.readall()
+        except ResourceNotFoundError as exc:
+            raise ErrorNoEncontrado(
+                codigo="blob_no_encontrado",
+                mensaje=(
+                    f"No existe el objeto '{clave}' en el contenedor '{contenedor}'."
+                ),
+            ) from exc
+
+        logger.info(
+            "almacenamiento_descargado",
+            contenedor=contenedor,
+            clave=clave,
+            tamano_bytes=len(contenido),
+        )
+        return contenido
 
     async def eliminar(self, contenedor: str, clave: str) -> None:
         blob_client = self._client.get_blob_client(container=contenedor, blob=clave)

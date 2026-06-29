@@ -18,7 +18,7 @@ from pokegrading.compartido.almacenamiento import (
     obtener_almacenamiento,
 )
 from pokegrading.compartido.dependencias import requerir_admin_o_superadmin
-from pokegrading.compartido.errores import ErrorValidacion
+from pokegrading.compartido.errores import ErrorSolicitudInvalida, ErrorValidacion
 from pokegrading.compartido.schemas.catalogo import CartaResponse, CrearCartaRequest
 from pokegrading.datos.db import obtener_sesion
 from pokegrading.negocio.catalogo.servicio import CrearCartaService
@@ -81,7 +81,7 @@ def _parsear_y_validar_datos(datos: str) -> CrearCartaRequest:
     try:
         datos_dict = json.loads(datos)
     except json.JSONDecodeError as exc:
-        raise ErrorValidacion(
+        raise ErrorSolicitudInvalida(
             codigo="datos_json_invalido",
             mensaje="El campo 'datos' no contiene un JSON válido.",
             campo="datos",

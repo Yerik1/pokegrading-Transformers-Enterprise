@@ -7,7 +7,13 @@ import {
   type BusquedaRapidaResponse,
 } from "@/evaluaciones/api/evaluaciones-api";
 
-type Paso = "captura" | "identificando" | "identificado" | "enviando" | "resultado" | "error";
+type Paso =
+  | "captura"
+  | "identificando"
+  | "identificado"
+  | "enviando"
+  | "resultado"
+  | "error";
 
 export function EnviarCartaPagina() {
   const [paso, setPaso] = useState<Paso>("captura");
@@ -42,7 +48,8 @@ export function EnviarCartaPagina() {
       setBusqueda(res);
       setPaso("identificado");
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Error al identificar la carta.";
+      const msg =
+        e instanceof Error ? e.message : "Error al identificar la carta.";
       setError(msg);
       setPaso("error");
     }
@@ -87,7 +94,8 @@ export function EnviarCartaPagina() {
           </h1>
           <p className="mt-3 text-ink-muted">
             Subí las fotos del frente y reverso de tu carta. El sistema la
-            identificará automáticamente y registrará tu solicitud.
+            identificará automáticamente, la preprocesará y calculará su grado
+            estimado.
           </p>
         </header>
 
@@ -118,20 +126,30 @@ export function EnviarCartaPagina() {
         )}
 
         {paso === "enviando" && (
-          <EstadoCargando mensaje="Enviando tu carta para evaluación..." />
+          <EstadoCargando mensaje="Procesando tu carta — preprocesamiento y calificación en progreso..." />
         )}
 
         {paso === "resultado" && resultado && (
-          <PasoResultado resultado={resultado} onNuevaEvaluacion={handleReintentar} />
+          <PasoResultado
+            resultado={resultado}
+            onNuevaEvaluacion={handleReintentar}
+          />
         )}
 
         {paso === "error" && (
-          <PasoError mensaje={error ?? "Error desconocido."} onReintentar={handleReintentar} />
+          <PasoError
+            mensaje={error ?? "Error desconocido."}
+            onReintentar={handleReintentar}
+          />
         )}
       </main>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────
+// Subcomponentes
+// ─────────────────────────────────────────────
 
 function PasoCaptura({
   prevFrente,
@@ -171,8 +189,8 @@ function PasoCaptura({
 
       <div className="rounded-card border border-ink/10 bg-cream p-4 text-sm text-ink-muted">
         <strong className="text-ink">Consejos para una buena foto:</strong> usá
-        buena iluminación, fondo oscuro, encuadrá bien la carta y asegurate de
-        que esté enfocada.
+        buena iluminación, fondo de color uniforme y contrastante, encuadrá
+        bien la carta y asegurate de que esté enfocada.
       </div>
 
       <div className="flex gap-4">
@@ -322,6 +340,66 @@ function PasoIdentificado({
   );
 }
 
+// ── Helpers para PasoResultado ─────────────────
+
+function etiquetaEstado(estado: string): {
+  texto: string;
+  colorTexto: string;
+  colorBorde: string;
+} {
+  switch (estado) {
+    case "completada":
+      return {
+        texto: "Calificada exitosamente",
+        colorTexto: "text-green-700",
+        colorBorde: "border-green-200 bg-green-50",
+      };
+    case "revision_manual":
+      return {
+        texto: "Derivada a revisión manual",
+        colorTexto: "text-yellow-700",
+        colorBorde: "border-yellow-200 bg-yellow-50",
+      };
+    case "rechazada":
+      return {
+        texto: "Rechazada — recapturar imagen",
+        colorTexto: "text-red-700",
+        colorBorde: "border-red-200 bg-red-50",
+      };
+    default:
+      return {
+        texto: estado,
+        colorTexto: "text-ink-muted",
+        colorBorde: "border-ink/10 bg-cream",
+      };
+  }
+}
+
+function BarraSubgrade({
+  label,
+  valor,
+}: {
+  label: string;
+  valor: number | null;
+}) {
+  if (valor === null) return null;
+  const porcentaje = (valor / 10) * 100;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-ink-muted">{label}</span>
+        <span className="font-semibold text-ink">{valor.toFixed(1)}</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-ink/10">
+        <div
+          className="h-2 rounded-full bg-holo transition-all"
+          style={{ width: `${porcentaje}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function PasoResultado({
   resultado,
   onNuevaEvaluacion,
@@ -329,8 +407,13 @@ function PasoResultado({
   resultado: EnviarCartaResponse;
   onNuevaEvaluacion: () => void;
 }) {
+  const { texto, colorTexto, colorBorde } = etiquetaEstado(resultado.estado);
+  const completada = resultado.estado === "completada";
+
   return (
     <div className="space-y-6">
+
+      {/* Identificador y estado */}
       <div className="rounded-card border border-holo/30 bg-cream p-8 text-center">
         <p className="text-xs font-medium uppercase tracking-wider text-holo">
           Evaluación registrada
@@ -338,30 +421,87 @@ function PasoResultado({
         <h2 className="mt-2 font-display text-3xl text-ink">
           {resultado.identificador_evaluacion}
         </h2>
-        <p className="mt-3 text-ink-muted">{resultado.mensaje}</p>
+        <div className={`mt-3 inline-block rounded-full border px-4 py-1 text-sm font-medium ${colorBorde} ${colorTexto}`}>
+          {texto}
+        </div>
+        <p className="mt-3 text-sm text-ink-muted">{resultado.mensaje}</p>
         {resultado.tiempo_estimado_segundos && (
-          <p className="mt-2 text-sm text-ink-subtle">
-            Tiempo estimado: {resultado.tiempo_estimado_segundos} segundos
+          <p className="mt-1 text-xs text-ink-subtle">
+            Tiempo estimado: {resultado.tiempo_estimado_segundos}s
           </p>
         )}
-        <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
-          <div className="rounded-card border border-ink/10 bg-cream-dark/20 p-3">
-            <p className="text-ink-muted">Calidad frente</p>
-            <p className="font-medium text-ink">
+      </div>
+
+      {/* Grado estimado — solo si completada (US 193) */}
+      {completada && resultado.grado_estimado !== null && (
+        <div className="rounded-card border border-holo/40 bg-cream p-6 text-center">
+          <p className="text-xs font-medium uppercase tracking-wider text-holo">
+            Grado estimado
+          </p>
+          <p className="mt-1 font-display text-7xl font-bold text-ink">
+            {resultado.grado_estimado.toFixed(1)}
+          </p>
+          <p className="text-sm text-ink-muted">escala 1.0 – 10.0</p>
+          {resultado.banda_incertidumbre !== null && (
+            <p className="mt-1 text-xs text-ink-subtle">
+              ± {resultado.banda_incertidumbre} puntos de incertidumbre
+            </p>
+          )}
+          {resultado.version_algoritmo_grading && (
+            <p className="mt-1 text-xs text-ink-subtle">
+              Algoritmo {resultado.version_algoritmo_grading}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Subgrades por dimensión — solo si completada (US 193) */}
+      {completada && resultado.subgrade_centering !== null && (
+        <div className="rounded-card border border-ink/10 bg-cream p-6">
+          <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-ink-muted">
+            Subgrades por dimensión
+          </h3>
+          <div className="space-y-4">
+            <BarraSubgrade label="Centering" valor={resultado.subgrade_centering} />
+            <BarraSubgrade label="Corners" valor={resultado.subgrade_corners} />
+            <BarraSubgrade label="Edges" valor={resultado.subgrade_edges} />
+            <BarraSubgrade label="Surface" valor={resultado.subgrade_surface} />
+          </div>
+        </div>
+      )}
+
+      {/* Mensaje de revisión manual */}
+      {resultado.estado === "revision_manual" && (
+        <div className="rounded-card border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-700">
+          El sistema no pudo calcular el grado con confianza suficiente. Un
+          evaluador humano revisará tu carta y te notificará el resultado.
+        </div>
+      )}
+
+      {/* Calidad de imagen — siempre visible */}
+      <div className="rounded-card border border-ink/10 bg-cream p-6">
+        <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-ink-muted">
+          Calidad de imagen
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-center">
+            <p className="text-xs text-ink-muted">Frente</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">
               {Math.round(resultado.iq_score_frente * 100)}%
             </p>
           </div>
-          <div className="rounded-card border border-ink/10 bg-cream-dark/20 p-3">
-            <p className="text-ink-muted">Calidad reverso</p>
-            <p className="font-medium text-ink">
+          <div className="text-center">
+            <p className="text-xs text-ink-muted">Reverso</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">
               {Math.round(resultado.iq_score_reverso * 100)}%
             </p>
           </div>
         </div>
       </div>
+
       <button
         onClick={onNuevaEvaluacion}
-        className="rounded-card bg-holo px-6 py-3 font-medium text-white transition hover:opacity-90"
+        className="w-full rounded-card bg-holo px-6 py-3 font-medium text-white transition hover:opacity-90"
       >
         Evaluar otra carta →
       </button>

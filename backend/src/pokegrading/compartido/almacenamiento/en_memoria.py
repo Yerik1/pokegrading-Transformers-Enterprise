@@ -7,6 +7,8 @@ al recargar el proceso. Pasa la suite de tests del contrato igual que
 
 from __future__ import annotations
 
+from pokegrading.compartido.errores import ErrorNoEncontrado
+
 
 class AlmacenamientoEnMemoria:
     """Almacenamiento en memoria — un dict bajo el capó."""
@@ -24,6 +26,22 @@ class AlmacenamientoEnMemoria:
     ) -> str:
         self._datos.setdefault(contenedor, {})[clave] = (contenido, content_type)
         return await self.obtener_url(contenedor, clave)
+
+    async def descargar(self, contenedor: str, clave: str) -> bytes:
+        """Devuelve los bytes guardados.
+
+        Raises:
+            ErrorNoEncontrado: si la clave no existe en el contenedor.
+        """
+        data = self._datos.get(contenedor, {}).get(clave)
+        if data is None:
+            raise ErrorNoEncontrado(
+                codigo="blob_no_encontrado",
+                mensaje=(
+                    f"No existe el objeto '{clave}' en el contenedor '{contenedor}'."
+                ),
+            )
+        return data[0]
 
     async def obtener_url(self, contenedor: str, clave: str) -> str:
         return f"memory://{contenedor}/{clave}"

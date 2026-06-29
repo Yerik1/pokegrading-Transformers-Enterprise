@@ -232,7 +232,7 @@ async def test_datos_json_invalido(
         files={"imagen_frente": ("f.jpg", imagen_jpeg_valida, "image/jpeg")},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 400
     assert resp.json()["error"] == "datos_json_invalido"
 
 

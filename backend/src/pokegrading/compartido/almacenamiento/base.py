@@ -42,6 +42,18 @@ class IAlmacenamientoImagenes(Protocol):
         """Devuelve la URL absoluta del recurso (no verifica que exista)."""
         ...
 
+    async def descargar(self, contenedor: str, clave: str) -> bytes:
+        """Descarga y devuelve los bytes del recurso.
+
+        Usado por el pipeline de preprocesamiento (Sprint 4, US 191)
+        para recuperar las imágenes originales subidas por
+        `EnviarCartaService` y procesarlas.
+
+        Raises:
+            ErrorNoEncontrado: si la clave no existe en el contenedor.
+        """
+        ...
+
     async def eliminar(self, contenedor: str, clave: str) -> None:
         """Elimina el recurso. Idempotente: no falla si no existe."""
         ...

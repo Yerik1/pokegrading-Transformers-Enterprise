@@ -143,6 +143,10 @@ class EnviarCartaService:
             evaluacion_id, submitter_id, correlation_id, calidad, subidas
         )
 
+        # Guardamos el ID para que el orquestador del pipeline pueda
+        # accederlo directamente sin necesitar una query adicional.
+        self.ultima_evaluacion_id: uuid.UUID = evaluacion.id
+
         return self._construir_respuesta(evaluacion, calidad, saturado, tiempo_estimado)
 
     # ------------------------------------------------------------------
@@ -271,7 +275,9 @@ class EnviarCartaService:
                 contenedor, clave_reverso, imagen_reverso, mime_reverso
             )
         except Exception:
-            await eliminar_blob_silencioso(contenedor, clave_frente, logger)
+            await eliminar_blob_silencioso(
+                self._almacenamiento, contenedor, clave_frente, logger
+            )
             raise
 
         return _ImagenesSubidas(url_frente, clave_frente, url_reverso, clave_reverso)
@@ -312,11 +318,17 @@ class EnviarCartaService:
                 await self._repo.guardar(evaluacion)
         except Exception:
             await eliminar_blob_silencioso(
-                CONTENEDOR_EVALUACIONES, subidas.clave_frente, logger
+                self._almacenamiento,
+                CONTENEDOR_EVALUACIONES,
+                subidas.clave_frente,
+                logger,
             )
             if subidas.clave_reverso is not None:
                 await eliminar_blob_silencioso(
-                    CONTENEDOR_EVALUACIONES, subidas.clave_reverso, logger
+                    self._almacenamiento,
+                    CONTENEDOR_EVALUACIONES,
+                    subidas.clave_reverso,
+                    logger,
                 )
             raise
 
