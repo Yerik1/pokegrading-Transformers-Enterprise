@@ -11,7 +11,6 @@ Verifica las funciones puras de scoring_subgrades.py:
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from pokegrading.negocio.evaluaciones.algoritmo.scoring_subgrades import (
     BANDA_INCERTIDUMBRE_CON_BASELINE_ESPECIFICO,
@@ -27,7 +26,6 @@ from pokegrading.negocio.evaluaciones.algoritmo.scoring_subgrades import (
     seleccionar_baseline,
 )
 from pokegrading.negocio.evaluaciones.tipos import RegionCarta
-
 
 # ---------------------------------------------------------------------------
 # Fixtures de baseline

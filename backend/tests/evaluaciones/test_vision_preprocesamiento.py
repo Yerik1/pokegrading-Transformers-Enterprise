@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import io
 
-import numpy as np
 import pytest
 from PIL import Image
 
@@ -19,7 +18,6 @@ from pokegrading.negocio.evaluaciones.algoritmo.vision_preprocesamiento import (
     _segmentar_regiones,
     preprocesar_imagen,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers para generar imágenes sintéticas
