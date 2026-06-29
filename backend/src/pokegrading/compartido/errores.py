@@ -4,6 +4,15 @@ Las excepciones de dominio se mapean a códigos HTTP en los handlers.
 El código de la aplicación NUNCA captura `Exception` desnudo (V6 §4.1):
 captura siempre la excepción de dominio específica o deja burbujear.
 
+Mapa de códigos HTTP:
+  400 Bad Request         → ErrorSolicitudInvalida  (input bien formado pero inutilizable)
+  401 Unauthorized        → ErrorAutenticacion
+  403 Forbidden           → ErrorAutorizacion
+  404 Not Found           → ErrorNoEncontrado
+  409 Conflict            → ErrorConflicto
+  422 Unprocessable       → ErrorValidacion         (formato/estructura de input inválida)
+  429 Too Many Requests   → ErrorRateLimit
+
 Formato de respuesta de error (consistente con la US "Mensajes de error
 específicos por campo"):
 
@@ -59,9 +68,31 @@ class ErrorDominio(Exception):
 
 
 class ErrorValidacion(ErrorDominio):
-    """Input inválido en alguna regla de dominio."""
+    """Validación de formato o estructura del input (HTTP 422).
+
+    Usar cuando el input no cumple el esquema esperado: tipo incorrecto,
+    campo requerido ausente, formato de imagen inválido, resolución
+    insuficiente, IQ Score bajo. Son errores que Pydantic o las reglas
+    de validación detectan antes de procesar el contenido.
+    """
 
     http_status = status.HTTP_422_UNPROCESSABLE_CONTENT
+
+
+class ErrorSolicitudInvalida(ErrorDominio):
+    """Input bien formado pero inutilizable para el procesamiento (HTTP 400).
+
+    Usar cuando el input supera la validación de formato pero el sistema
+    no puede procesarlo por razones de contenido: imagen donde no se puede
+    aislar la carta del fondo, distorsión de perspectiva imposible de
+    corregir, JSON semánticamente inválido aunque esté bien formado.
+
+    La distinción respecto a ErrorValidacion (422):
+      - 422: el input tiene problemas de estructura/formato/esquema.
+      - 400: el input tiene estructura correcta pero el contenido no sirve.
+    """
+
+    http_status = status.HTTP_400_BAD_REQUEST
 
 
 class ErrorConflicto(ErrorDominio):

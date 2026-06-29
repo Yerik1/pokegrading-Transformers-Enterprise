@@ -8,6 +8,14 @@ export interface EnviarCartaResponse {
   mensaje: string;
   tiempo_estimado_segundos: number | null;
   created_at: string;
+  // Campos Sprint 4 — US 191 / US 193
+  grado_estimado: number | null;
+  banda_incertidumbre: number | null;
+  subgrade_centering: number | null;
+  subgrade_corners: number | null;
+  subgrade_edges: number | null;
+  subgrade_surface: number | null;
+  version_algoritmo_grading: string | null;
 }
 
 export interface CandidatoResponse {
@@ -33,7 +41,10 @@ export async function enviarCartaApi(
   const form = new FormData();
   form.append("imagen_frente", imagenFrente);
   form.append("imagen_reverso", imagenReverso);
-  const res = await cliente.post<EnviarCartaResponse>("/api/v1/evaluaciones/enviar", form);
+  const res = await cliente.post<EnviarCartaResponse>(
+    "/api/v1/evaluaciones/enviar",
+    form
+  );
   return res.data;
 }
 
@@ -42,6 +53,9 @@ export async function busquedaRapidaApi(
 ): Promise<BusquedaRapidaResponse> {
   const form = new FormData();
   form.append("imagen_frente", imagenFrente);
-  const res = await cliente.post<BusquedaRapidaResponse>("/api/v1/identificacion/busqueda-rapida", form);
+  const res = await cliente.post<BusquedaRapidaResponse>(
+    "/api/v1/identificacion/busqueda-rapida",
+    form
+  );
   return res.data;
 }
