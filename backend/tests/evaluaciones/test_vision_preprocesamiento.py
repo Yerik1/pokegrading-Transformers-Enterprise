@@ -9,12 +9,17 @@ from __future__ import annotations
 
 import io
 
+import numpy as np
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from pokegrading.compartido.errores import ErrorSolicitudInvalida
 from pokegrading.negocio.evaluaciones.algoritmo.vision_preprocesamiento import (
+    ANGULO_ROTACION_MINIMO_PARA_CORREGIR,
     ImagenPreprocesada,
+    _aplicar_correccion_perspectiva,
+    _detectar_contorno_carta,
+    _estimar_angulo_rotacion,
     _segmentar_regiones,
     preprocesar_imagen,
 )
@@ -50,6 +55,32 @@ def _imagen_con_carta(
         outline=(0, 0, 0),
         width=10,
     )
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=95)
+    return buf.getvalue()
+
+
+def _imagen_con_carta_rotada(
+    angulo_grados: float,
+    ancho: int = 1000,
+    alto: int = 1300,
+    color_fondo: tuple = (235, 235, 235),
+    color_carta: tuple = (60, 60, 60),
+) -> bytes:
+    """Imagen con una carta rotada un ángulo REAL conocido (rotando la
+    foto entera, como pasaría con una captura real en ángulo). Incluye
+    líneas internas para que el IQ Score de nitidez no la rechace
+    antes de llegar al preprocesamiento.
+    """
+    img = Image.new("RGB", (ancho, alto), color=color_fondo)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([200, 200, 800, 1100], fill=color_carta, outline=(0, 0, 0), width=14)
+    for y in range(220, 1080, 40):
+        draw.line([220, y, 780, y], fill=(80, 80, 80), width=2)
+    if angulo_grados != 0:
+        img = img.rotate(
+            angulo_grados, resample=Image.BICUBIC, expand=True, fillcolor=color_fondo
+        )
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=95)
     return buf.getvalue()
@@ -130,3 +161,82 @@ def test_preprocesar_imagen_regiones_tienen_claves_correctas() -> None:
     assert "corners" in resultado.regiones
     assert "edges" in resultado.regiones
     assert "surface" in resultado.regiones
+
+
+# ---------------------------------------------------------------------------
+# _estimar_angulo_rotacion / _aplicar_correccion_perspectiva (US 191:
+# "corrección de perspectiva" real, no solo detección para aceptar/
+# rechazar)
+# ---------------------------------------------------------------------------
+
+
+def test_estimar_angulo_rotacion_imagen_derecha_es_cercano_a_cero() -> None:
+    """Carta sin rotación real: el ángulo estimado debe ser ~0."""
+    imagen = _imagen_con_carta_rotada(0)
+    arr_gris = np.array(Image.open(io.BytesIO(imagen)).convert("L"), dtype=np.float32)
+    contorno = _detectar_contorno_carta(arr_gris)
+    assert contorno is not None
+    angulo = _estimar_angulo_rotacion(arr_gris, contorno)
+    assert abs(angulo) < 1.0
+
+
+@pytest.mark.parametrize("angulo_real", [3, 7, 10, -5, -10])
+def test_estimar_angulo_rotacion_se_acerca_al_angulo_real(angulo_real: float) -> None:
+    """El ángulo estimado (con signo) debe acercarse al ángulo real
+    conocido con el que se generó la imagen sintética, dentro de un
+    margen de error razonable para una heurística simple.
+    """
+    imagen = _imagen_con_carta_rotada(angulo_real)
+    arr_gris = np.array(Image.open(io.BytesIO(imagen)).convert("L"), dtype=np.float32)
+    contorno = _detectar_contorno_carta(arr_gris)
+    assert contorno is not None
+    angulo_estimado = _estimar_angulo_rotacion(arr_gris, contorno)
+    # Mismo signo que el ángulo real
+    assert (angulo_estimado > 0) == (angulo_real > 0)
+    # Dentro de 1 grado de error
+    assert abs(angulo_estimado - angulo_real) < 1.0
+
+
+def test_estimar_angulo_rotacion_region_muy_pequena_devuelve_cero() -> None:
+    """Contorno casi sin área: no hay suficiente evidencia, se asume 0."""
+    arr_gris = np.zeros((5, 5), dtype=np.float32)
+    angulo = _estimar_angulo_rotacion(arr_gris, (0, 0, 5, 5))
+    assert angulo == 0.0
+
+
+def test_aplicar_correccion_no_rota_si_angulo_insignificante() -> None:
+    """Por debajo del umbral mínimo, la imagen se devuelve sin tocar
+    (evita resampleo innecesario en la mayoría de capturas, que ya
+    vienen razonablemente derechas)."""
+    imagen = Image.new("RGB", (200, 300), color=(255, 255, 255))
+    angulo_insignificante = ANGULO_ROTACION_MINIMO_PARA_CORREGIR / 2
+    resultado = _aplicar_correccion_perspectiva(imagen, angulo_insignificante)
+    assert resultado is imagen  # mismo objeto, ni siquiera se copia
+
+
+def test_aplicar_correccion_rota_si_angulo_significativo() -> None:
+    """Por encima del umbral, sí debe rotar (el lienzo cambia de tamaño
+    por el expand=True, evidencia indirecta de que rotó)."""
+    imagen = Image.new("RGB", (200, 300), color=(255, 255, 255))
+    resultado = _aplicar_correccion_perspectiva(imagen, 10.0)
+    assert resultado is not imagen
+    assert resultado.size != imagen.size  # expand=True agranda el lienzo
+
+
+def test_preprocesar_imagen_carta_rotada_no_falla_y_corrige() -> None:
+    """Una carta con rotación moderada (dentro de lo corregible) debe
+    preprocesarse exitosamente, con el ángulo aplicado registrado.
+    """
+    imagen = _imagen_con_carta_rotada(8)
+    resultado = preprocesar_imagen(imagen, campo="imagen_frente")
+    assert isinstance(resultado, ImagenPreprocesada)
+    assert len(resultado.regiones) == 4
+
+
+def test_preprocesar_imagen_carta_derecha_no_se_distorsiona() -> None:
+    """Sanity check de no-regresión: una carta sin rotación sigue
+    preprocesándose igual que antes de agregar la corrección."""
+    imagen = _imagen_con_carta_rotada(0)
+    resultado = preprocesar_imagen(imagen, campo="imagen_frente")
+    assert isinstance(resultado, ImagenPreprocesada)
+    assert len(resultado.regiones) == 4

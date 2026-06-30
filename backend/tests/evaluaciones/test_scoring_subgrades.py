@@ -16,6 +16,7 @@ from pokegrading.negocio.evaluaciones.algoritmo.scoring_subgrades import (
     BANDA_INCERTIDUMBRE_CON_BASELINE_ESPECIFICO,
     BANDA_INCERTIDUMBRE_CON_BASELINE_GLOBAL,
     MARGEN_COHERENCIA_GRADO_FINAL,
+    MARGEN_MAXIMO_INCOHERENCIA_INTERNA,
     MUESTRA_MINIMA_GROUND_TRUTH,
     ReferenciaBaseline,
     ResultadoCalificacion,
@@ -23,6 +24,7 @@ from pokegrading.negocio.evaluaciones.algoritmo.scoring_subgrades import (
     calcular_calificacion,
     calcular_grado_final,
     calcular_subgrade,
+    detectar_incoherencia_interna,
     seleccionar_baseline,
 )
 from pokegrading.negocio.evaluaciones.tipos import RegionCarta
@@ -211,6 +213,99 @@ def test_calcular_grado_final_ignora_none_en_subgrades() -> None:
 
 
 # ---------------------------------------------------------------------------
+# detectar_incoherencia_interna
+# ---------------------------------------------------------------------------
+
+
+def test_incoherencia_subgrades_muy_dispares_es_true() -> None:
+    """Tres subgrades perfectos y uno pésimo: dispersión extrema."""
+    subgrades = {
+        "centering": 9.0,
+        "corners": 9.0,
+        "edges": 9.0,
+        "surface": 1.0,
+    }
+    assert detectar_incoherencia_interna(subgrades) is True
+
+
+def test_incoherencia_subgrades_homogeneos_es_false() -> None:
+    subgrades = {
+        "centering": 5.0,
+        "corners": 5.0,
+        "edges": 5.0,
+        "surface": 5.0,
+    }
+    assert detectar_incoherencia_interna(subgrades) is False
+
+
+def test_incoherencia_dispersion_moderada_es_false() -> None:
+    """Dispersión razonable (no todo es 9,9,9,1) no debe disparar el alterno."""
+    subgrades = {
+        "centering": 8.0,
+        "corners": 7.0,
+        "edges": 6.0,
+        "surface": 5.0,
+    }
+    assert detectar_incoherencia_interna(subgrades) is False
+
+
+def test_incoherencia_con_un_solo_subgrade_es_false() -> None:
+    """No hay suficiente información para hablar de dispersión."""
+    subgrades = {
+        "centering": 7.0,
+        "corners": None,
+        "edges": None,
+        "surface": None,
+    }
+    assert detectar_incoherencia_interna(subgrades) is False
+
+
+def test_incoherencia_todos_none_es_false() -> None:
+    subgrades = {
+        "centering": None,
+        "corners": None,
+        "edges": None,
+        "surface": None,
+    }
+    assert detectar_incoherencia_interna(subgrades) is False
+
+
+def test_incoherencia_justo_debajo_del_umbral_es_false() -> None:
+    """Dispersión apenas por debajo del umbral no debe disparar el alterno."""
+    # diferencia = promedio - (minimo + 0.5). Con surface=7.4 da diferencia ~1.4 (< 1.5).
+    subgrades = {"centering": 10.0, "corners": 10.0, "edges": 10.0, "surface": 7.4}
+    promedio = sum(subgrades.values()) / 4
+    limite = min(subgrades.values()) + MARGEN_COHERENCIA_GRADO_FINAL
+    assert (promedio - limite) < MARGEN_MAXIMO_INCOHERENCIA_INTERNA
+    assert detectar_incoherencia_interna(subgrades) is False
+
+
+def test_incoherencia_justo_encima_del_umbral_es_true() -> None:
+    """Dispersión apenas por encima del umbral SÍ debe disparar el alterno."""
+    # Con surface=7.2 da diferencia ~1.55 (> 1.5).
+    subgrades = {"centering": 10.0, "corners": 10.0, "edges": 10.0, "surface": 7.2}
+    promedio = sum(subgrades.values()) / 4
+    limite = min(subgrades.values()) + MARGEN_COHERENCIA_GRADO_FINAL
+    assert (promedio - limite) > MARGEN_MAXIMO_INCOHERENCIA_INTERNA
+    assert detectar_incoherencia_interna(subgrades) is True
+
+
+def test_calcular_calificacion_incoherencia_detectada_propaga_al_resultado() -> None:
+    """calcular_calificacion debe exponer incoherencia_detectada en el resultado."""
+    regiones = {
+        "centering": _region(50, 50, 250),  # va a salir alto (poca asimetria)
+        "corners": _region(20, 20, 255),
+        "edges": _region(20, 100, 255),
+        "surface": _region(
+            50, 50, 128
+        ),  # uniforme -> alto tambien en este setup sintetico
+    }
+    resultado = calcular_calificacion(regiones, None, _baseline_global())
+    assert hasattr(resultado, "incoherencia_detectada")
+    assert isinstance(resultado.incoherencia_detectada, bool)
+
+
+# ---------------------------------------------------------------------------
 # calcular_banda_incertidumbre
 # ---------------------------------------------------------------------------
 
@@ -276,6 +371,40 @@ def test_calcular_calificacion_usa_baseline_especifico() -> None:
         _baseline_global(),
     )
     assert resultado.banda_incertidumbre == BANDA_INCERTIDUMBRE_CON_BASELINE_ESPECIFICO
+
+
+def test_calcular_calificacion_persiste_version_del_baseline_realmente_usado() -> None:
+    """US 193: 'se persiste con el identificador exacto de versión del
+    algoritmo'. Si se usó el baseline específico, version_algoritmo_usada
+    y baseline_id_usado deben reflejar el ESPECÍFICO, no el global —
+    antes de este fix, el servicio siempre persistía la versión del
+    global sin importar cuál se usó de verdad para calificar.
+    """
+    especifico = _baseline_especifico(muestra=MUESTRA_MINIMA_GROUND_TRUTH)
+    especifico.id = "id-del-especifico"
+    especifico.version_algoritmo = "v2.0-especifico"
+    global_ = _baseline_global()
+    global_.id = "id-del-global"
+    global_.version_algoritmo = "v1.0-global"
+
+    resultado = calcular_calificacion(_regiones_validas(), especifico, global_)
+
+    assert resultado.version_algoritmo_usada == "v2.0-especifico"
+    assert resultado.baseline_id_usado == "id-del-especifico"
+
+
+def test_calcular_calificacion_sin_especifico_persiste_version_del_global() -> None:
+    """Caso fallback: sin baseline específico (o sin muestra suficiente),
+    version_algoritmo_usada y baseline_id_usado deben ser los del global.
+    """
+    global_ = _baseline_global()
+    global_.id = "id-del-global"
+    global_.version_algoritmo = "v1.0-global"
+
+    resultado = calcular_calificacion(_regiones_validas(), None, global_)
+
+    assert resultado.version_algoritmo_usada == "v1.0-global"
+    assert resultado.baseline_id_usado == "id-del-global"
 
 
 def test_calcular_calificacion_regla_coherencia_verificada() -> None:

@@ -63,6 +63,24 @@ DESVIACION_LOCAL_MAXIMA: float = 25.0
 
 MARGEN_COHERENCIA_GRADO_FINAL: float = 0.5
 
+# ---------------------------------------------------------------------------
+# Incoherencia interna (US 193, alterno explícito): "si el resultado
+# contradice umbrales mínimos de coherencia interna, se deriva a
+# revisión humana".
+#
+# La regla de coherencia de arriba es un RECORTE (clamp): el grado
+# final siempre se ajusta para cumplirla, así que nunca puede
+# "contradecirla" por construcción. Este umbral mide algo distinto e
+# independiente: cuánto tuvo que recortarse el promedio crudo de los
+# subgrades para llegar al grado final. Si esa caída es muy grande
+# (ej. subgrades 9, 9, 9, 1 -> promedio 7 recortado a 1.5, una caída
+# de 5.5), los subgrades están en franco desacuerdo entre sí — eso es
+# evidencia de que el algoritmo no está midiendo la carta de forma
+# consistente, no algo para resolver en silencio con el recorte.
+# ---------------------------------------------------------------------------
+
+MARGEN_MAXIMO_INCOHERENCIA_INTERNA: float = 1.5
+
 # Tamaño de muestra mínimo para confiar en un baseline específico de
 # (set, acabado) en vez de usar el baseline global como fallback.
 MUESTRA_MINIMA_GROUND_TRUTH: int = 30
@@ -100,6 +118,9 @@ class ResultadoCalificacion:
     grado_estimado: float | None
     banda_incertidumbre: float | None
     dimension_no_calculable: str | None  # nombre de la dimensión que falló, si alguna
+    incoherencia_detectada: bool = False
+    baseline_id_usado: str | None = None
+    version_algoritmo_usada: str | None = None
 
 
 def _score_centering(region_centering: np.ndarray) -> float:
@@ -221,6 +242,36 @@ def calcular_grado_final(
     return round(grado_final, 2), subgrade_minimo
 
 
+def detectar_incoherencia_interna(subgrades: dict[str, float | None]) -> bool:
+    """Determina si los subgrades están demasiado dispersos entre sí
+    como para confiar en el grado final ajustado por
+    `calcular_grado_final` (alterno de US 193: "si el resultado
+    contradice umbrales mínimos de coherencia interna, se deriva a
+    revisión humana").
+
+    Independiente del recorte de coherencia: mide cuánto tuvo que
+    bajar el promedio crudo de los subgrades para cumplir la regla
+    (promedio - límite_coherencia). Una caída grande indica que las
+    cuatro dimensiones no están de acuerdo entre sí, más allá de lo
+    que el recorte automático puede resolver con sentido.
+
+    Returns:
+        True si la dispersión supera MARGEN_MAXIMO_INCOHERENCIA_INTERNA.
+        False si hay menos de 2 subgrades calculados (no hay suficiente
+        información para hablar de "dispersión").
+    """
+    valores = [v for v in subgrades.values() if v is not None]
+    if len(valores) < 2:
+        return False
+
+    promedio = sum(valores) / len(valores)
+    subgrade_minimo = min(valores)
+    limite_coherencia = subgrade_minimo + MARGEN_COHERENCIA_GRADO_FINAL
+
+    diferencia_recorte = promedio - limite_coherencia
+    return diferencia_recorte > MARGEN_MAXIMO_INCOHERENCIA_INTERNA
+
+
 def calcular_banda_incertidumbre(baseline_usado: ReferenciaBaseline) -> float:
     """Calcula la banda de incertidumbre del grado estimado.
 
@@ -268,6 +319,7 @@ def calcular_calificacion(
             dimension_fallida = dimension.value
 
     grado_final, subgrade_minimo = calcular_grado_final(subgrades)
+    incoherencia = detectar_incoherencia_interna(subgrades)
     banda = (
         calcular_banda_incertidumbre(baseline_usado)
         if grado_final is not None
@@ -281,6 +333,7 @@ def calcular_calificacion(
         baseline_es_global=baseline_usado.es_global,
         version_algoritmo=baseline_usado.version_algoritmo,
         dimension_fallida=dimension_fallida,
+        incoherencia_detectada=incoherencia,
     )
 
     return ResultadoCalificacion(
@@ -291,4 +344,7 @@ def calcular_calificacion(
         grado_estimado=grado_final,
         banda_incertidumbre=banda,
         dimension_no_calculable=dimension_fallida,
+        incoherencia_detectada=incoherencia,
+        baseline_id_usado=baseline_usado.id,
+        version_algoritmo_usada=baseline_usado.version_algoritmo,
     )

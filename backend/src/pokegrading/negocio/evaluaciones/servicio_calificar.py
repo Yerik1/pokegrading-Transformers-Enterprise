@@ -27,7 +27,6 @@ hashes de imagen). Si existe, se retorna esa evaluación sin reprocesar.
 
 from __future__ import annotations
 
-import hashlib
 import uuid
 from io import BytesIO
 
@@ -44,6 +43,7 @@ from pokegrading.negocio.evaluaciones.algoritmo.scoring_subgrades import (
     ResultadoCalificacion,
     calcular_calificacion,
 )
+from pokegrading.negocio.evaluaciones.idempotencia import calcular_clave_idempotencia
 from pokegrading.negocio.evaluaciones.modelos import Evaluacion, GradingBaseline
 from pokegrading.negocio.evaluaciones.repositorio import (
     EvaluacionRepositorio,
@@ -126,7 +126,7 @@ class CalificarCartaService:
             regiones, baseline_especifico, baseline_global
         )
 
-        await self._persistir_calificacion(evaluacion, resultado, baseline_global)
+        await self._persistir_calificacion(evaluacion, resultado)
 
         return evaluacion
 
@@ -154,16 +154,27 @@ class CalificarCartaService:
     # Idempotencia (US 193: "la operación es idempotente")
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _calcular_clave_idempotencia(evaluacion: Evaluacion) -> str:
-        """Deriva una clave determinística de (submitter, imágenes originales).
+    async def _calcular_clave_idempotencia(self, evaluacion: Evaluacion) -> str:
+        """Deriva la clave de idempotencia descargando el contenido real
+        de las imágenes originales y delegando el hash a la función
+        compartida (`idempotencia.calcular_clave_idempotencia`), la
+        misma que usa el chequeo temprano de `PipelineEvaluacionService`.
 
-        Dos envíos de la misma carta por el mismo submitter producen
-        la misma clave, sin necesidad de que el cliente envíe un
-        identificador explícito.
+        Este chequeo es de RESPALDO: el chequeo principal corre antes,
+        en el pipeline, con los bytes ya en memoria (sin necesidad de
+        descargarlos de Blob Storage). Este sigue acá por si dos envíos
+        idénticos llegan en paralelo y ambos pasan el chequeo temprano
+        antes de que el primero termine de persistirse.
         """
-        base = f"{evaluacion.submitter_id}:{evaluacion.clave_blob_frente}:{evaluacion.clave_blob_reverso}"
-        return hashlib.sha256(base.encode("utf-8")).hexdigest()
+        bytes_frente = await self._almacenamiento.descargar(
+            CONTENEDOR_EVALUACIONES, evaluacion.clave_blob_frente
+        )
+        bytes_reverso = await self._almacenamiento.descargar(
+            CONTENEDOR_EVALUACIONES, evaluacion.clave_blob_reverso
+        )
+        return calcular_clave_idempotencia(
+            evaluacion.submitter_id, bytes_frente, bytes_reverso
+        )
 
     async def _verificar_idempotencia(
         self, evaluacion: Evaluacion
@@ -171,12 +182,18 @@ class CalificarCartaService:
         """Si ya existe una evaluación completada con la misma clave de
         idempotencia, la devuelve sin reprocesar.
 
+        El orden importa: `clave_idempotencia` es `unique=True` en BD.
+        Hay que confirmar primero que NO existe un duplicado antes de
+        asignar la clave al registro actual; si se asigna antes de
+        consultar, un reintento real (mismo contenido) dispara un
+        autoflush que intenta persistir dos filas con la misma clave
+        única y la sesión revienta con IntegrityError.
+
         Returns:
             La evaluación previa si es un reintento, o None si se debe
             continuar con el procesamiento normal.
         """
-        clave = self._calcular_clave_idempotencia(evaluacion)
-        evaluacion.clave_idempotencia = clave
+        clave = await self._calcular_clave_idempotencia(evaluacion)
 
         previa = await self._repo.obtener_por_clave_idempotencia(clave)
         if (
@@ -191,6 +208,9 @@ class CalificarCartaService:
             )
             return previa
 
+        # Solo el registro "canónico" (el primero con este contenido)
+        # se queda con la clave de idempotencia persistida.
+        evaluacion.clave_idempotencia = clave
         return None
 
     # ------------------------------------------------------------------
@@ -270,9 +290,17 @@ class CalificarCartaService:
         self,
         evaluacion: Evaluacion,
         resultado: ResultadoCalificacion,
-        baseline_global: ReferenciaBaseline,
     ) -> None:
         """Guarda los subgrades calculados y avanza el estado final.
+
+        US 193, criterio de aceptación explícito: "La evaluación se
+        persiste con el identificador exacto de versión del algoritmo
+        y queda inmutable". Se persiste la versión y el ID del
+        baseline que REALMENTE se usó para calcular (`resultado`,
+        ya resuelto por `seleccionar_baseline` dentro del algoritmo
+        puro), no siempre el del baseline global — antes este método
+        recibía `baseline_global` directo y lo persistía sin importar
+        si en realidad se había usado el específico de (set, acabado).
 
         Alterno de la US: "Si algún subgrade no puede calcularse con
         insumos suficientes, la carta se deriva a calificación manual."
@@ -285,7 +313,9 @@ class CalificarCartaService:
         evaluacion.subgrade_surface = resultado.subgrade_surface
         evaluacion.grado_estimado = resultado.grado_estimado
         evaluacion.banda_incertidumbre = resultado.banda_incertidumbre
-        evaluacion.version_algoritmo_grading = baseline_global.version_algoritmo
+        evaluacion.version_algoritmo_grading = resultado.version_algoritmo_usada
+        if resultado.baseline_id_usado is not None:
+            evaluacion.baseline_id_usado = uuid.UUID(resultado.baseline_id_usado)
 
         if (
             resultado.dimension_no_calculable is not None
@@ -297,6 +327,13 @@ class CalificarCartaService:
                 f"'{resultado.dimension_no_calculable}' con insumos suficientes."
             )
             evento = "evaluacion_derivada_revision_manual_calificacion"
+        elif resultado.incoherencia_detectada:
+            evaluacion.estado = EstadoEvaluacion.REVISION_MANUAL.value
+            evaluacion.motivo_revision_manual = (
+                "Los subgrades calculados son demasiado dispares entre sí "
+                "(coherencia interna insuficiente); se requiere revisión humana."
+            )
+            evento = "evaluacion_derivada_revision_manual_incoherencia"
         else:
             evaluacion.estado = EstadoEvaluacion.COMPLETADA.value
             evento = "evaluacion_completada"
@@ -308,5 +345,6 @@ class CalificarCartaService:
             evento,
             evaluacion_id=str(evaluacion.id),
             grado_estimado=resultado.grado_estimado,
-            version_algoritmo=baseline_global.version_algoritmo,
+            version_algoritmo=resultado.version_algoritmo_usada,
+            baseline_id_usado=resultado.baseline_id_usado,
         )

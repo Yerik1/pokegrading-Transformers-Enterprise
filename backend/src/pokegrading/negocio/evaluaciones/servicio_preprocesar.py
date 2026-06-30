@@ -26,7 +26,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pokegrading.compartido.almacenamiento import IAlmacenamientoImagenes
-from pokegrading.compartido.errores import ErrorNoEncontrado, ErrorValidacion
+from pokegrading.compartido.errores import ErrorNoEncontrado, ErrorSolicitudInvalida
 from pokegrading.compartido.logging import obtener_logger
 from pokegrading.datos.db import unidad_de_trabajo
 from pokegrading.negocio.evaluaciones.algoritmo.vision_preprocesamiento import (
@@ -83,7 +83,7 @@ class PreprocesarCartaService:
             resultado_frente, resultado_reverso = self._preprocesar_ambas_caras(
                 bytes_frente, bytes_reverso
             )
-        except ErrorValidacion as exc:
+        except ErrorSolicitudInvalida as exc:
             await self._derivar_segun_error(evaluacion, exc)
             return evaluacion
 
@@ -168,7 +168,7 @@ class PreprocesarCartaService:
     # ------------------------------------------------------------------
 
     async def _derivar_segun_error(
-        self, evaluacion: Evaluacion, error: ErrorValidacion
+        self, evaluacion: Evaluacion, error: ErrorSolicitudInvalida
     ) -> None:
         """Aplica los alternos de la US:
 

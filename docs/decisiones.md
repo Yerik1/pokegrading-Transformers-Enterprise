@@ -166,7 +166,67 @@ está hospedado en GitHub.
 Branch protection configurada en `develop` y `main` requiriendo CI verde.
 
 ---
+## D-008 · Calibración real de baselines (ground truth PSA): diferida, no implementada en Sprint 4
 
+**Fecha:** Sprint 4
+**Estado:** Aceptada, con tech-debt explícito
+
+**Contexto:** los campos `referencia_centering`, `referencia_corners`,
+`referencia_edges` y `referencia_surface` de `GradingBaseline` se cargan en
+`CalificarCartaService` pero nunca se usan para calcular ni ajustar ningún
+subgrade — solo determinan qué tan ancha es la banda de incertidumbre
+(`calcular_banda_incertidumbre`) y qué versión de algoritmo se loguea. La
+"selección" del baseline (específico vs. global, según `tamano_muestra`)
+funciona correctamente, pero el baseline seleccionado no calibra nada en la
+práctica.
+
+El Caso de Negocio v1.6 (pág. 11) es explícito sobre qué debería pasar:
+
+> "El dataset de 800 cartas con grading PSA confirmado se usa para calibrar
+> los parámetros de nuestro algoritmo (...) qué métricas geométricas y de
+> superficie corresponden a qué grados PSA dentro de cada set y cada tipo
+> de acabado."
+
+Y el requisito R10 (★) exige: "el dataset de 800 cartas con grading PSA
+confirmado debe auditarse antes de la versión 1.0 del algoritmo". Ese
+dataset no existe en el repo ni en el ambiente de desarrollo — el baseline
+global sembrado en la migración `0007_pipeline_grading` tiene
+`tamano_muestra=0`. Implementar una fórmula de calibración sin datos reales
+de PSA contra los cuales validarla no es "calibrar": es inventar un umbral
+arbitrario, lo cual contradice el propio R10 y arriesga producir grados
+menos confiables que los actuales, no más.
+
+**Decisión:** dejar la calibración real fuera del alcance del Sprint 4. La
+selección de baseline (específico/global con fallback) queda implementada
+y probada; la calibración contra `referencia_*` queda pendiente hasta que
+exista el dataset de 800 cartas PSA (o un subconjunto curado, como anticipa
+la definición de "Ground Truth" del Caso de Negocio) para derivar esos
+valores de referencia de forma auditable, en línea con S5 (regresión
+automática del algoritmo contra el dataset de calibración).
+
+**Alternativas evaluadas:**
+- Implementar una fórmula de calibración igual (ej. `score / referencia`,
+  acotado a 1.0) usando los valores placeholder actuales (`0.7` en los
+  cuatro ejes, sembrados por la migración): se descartó porque, verificado
+  empíricamente, homogeniza casi todos los subgrades hacia 10.0 con
+  cualquier carta de calidad media-alta — degrada la capacidad de
+  diferenciar calidad entre cartas en vez de mejorarla, sin ninguna base
+  estadística real detrás del número `0.7`.
+- Marcar el campo `tamano_muestra` como bloqueante (rechazar evaluación si
+  no hay baseline calibrado): contradice el criterio de aceptación de la
+  US 193, que pide explícitamente fallback al global cuando no hay ground
+  truth suficiente.
+
+**Consecuencias:** el sistema persiste correctamente qué baseline se usó
+(`baseline_id_usado`, `version_algoritmo_grading` — ver fix de Sprint 4) y
+la selección específico/global es funcional y testeada, pero el grado
+reportado hoy es equivalente a un baseline global no calibrado para todos
+los casos. Cuando se incorpore el dataset de 800 cartas PSA (o el
+subconjunto inicial mencionado en el Caso de Negocio), la calibración real
+debe entrar como una US propia de un sprint futuro, con su propia suite de
+regresión contra el dataset (S5) antes de habilitarse en producción.
+
+---
 ## Plantilla para nuevas entradas
 
 ```markdown
